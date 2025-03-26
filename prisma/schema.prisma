@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Change provider to sqlite
+  url      = env("DATABASE_URL") // Use environment variable
+}
+
+// Start defining your models based on database-schema.txt [cite: MindShift/database-schema.txt]
+
+model User {
+  userId          Int       @id @default(autoincrement())
+  username        String    @unique
+  email           String    @unique
+  passwordHash    String // Renamed from password_hash
+  displayName     String? // Renamed from display_name
+  bio             String?
+  profileImageUrl String? // Renamed from profile_image_url
+  totalPoints     Int       @default(0) // Renamed from total_points
+  rank            Int?
+  createdAt       DateTime  @default(now()) // Renamed from created_at
+  lastLogin       DateTime? // Renamed from last_login
+  isActive        Boolean   @default(true) // Renamed from is_active
+  isVerified      Boolean   @default(false) // Renamed from is_verified
+  isAdmin         Boolean   @default(false) // Renamed from is_admin
+
+  // Relations (add more as needed)
+  authProviders AuthProvider[]
+  debates       Debate[]
+  arguments     Argument[]
+  comments      Comment[]
+  achievements  UserAchievement[]
+  notifications Notification[]
+  sessions      Session[]
+
+  @@map("users") // Maps to the 'users' table
+}
+
+model AuthProvider {
+  providerId     Int      @id @default(autoincrement())
+  userId         Int
+  providerName   String   // 'google', 'github', etc.
+  providerUserId String
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([providerName, providerUserId])
+  @@map("auth_providers")
+}
+
+model Topic {
+  topicId         Int      @id @default(autoincrement())
+  name            String
+  description     String?
+  category        String?  // Consider relating this to a Category model later
+  isSponsored     Boolean  @default(false)
+  sponsorId       Int?     // Consider relating this to User later
+  currentStance   Float    // Prisma uses Float for DECIMAL
+  stanceReasoning String?
+  debateCount     Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isActive        Boolean  @default(true)
+
+  // Relations (add more as needed)
+  debates Debate[]
+
+  @@map("topics")
+}
+
+// Add other models like Debate, Argument, Comment etc. here later based on schema.txt [cite: MindShift/database-schema.txt]
+// Minimal Debate model for relation:
+model Debate {
+  debateId Int @id @default(autoincrement())
+  topicId  Int
+  userId   Int
+
+  topic Topic @relation(fields: [topicId], references: [topicId])
+  user  User  @relation(fields: [userId], references: [userId])
+
+  // ... other debate fields based on schema.txt [cite: MindShift/database-schema.txt]
+  arguments Argument[]
+  comments  Comment[]
+
+  @@map("debates")
+}
+
+ // Minimal Argument model for relation:
+model Argument {
+    argumentId Int @id @default(autoincrement())
+    debateId Int
+    userId Int
+
+    debate Debate @relation(fields: [debateId], references: [debateId])
+    user User @relation(fields: [userId], references: [userId])
+
+    // ... other argument fields based on schema.txt [cite: MindShift/database-schema.txt]
+
+    @@map("arguments")
+}
+
+ // Minimal Comment model for relation:
+model Comment {
+    commentId Int @id @default(autoincrement())
+    debateId Int?
+    userId Int
+    parentId Int? @map("parent_comment_id")
+
+    debate Debate? @relation(fields: [debateId], references: [debateId])
+    user User @relation(fields: [userId], references: [userId])
+    parent Comment? @relation("CommentReplies", fields: [parentId], references: [commentId], onDelete: NoAction, onUpdate: NoAction)
+    replies Comment[] @relation("CommentReplies")
+
+    // ... other comment fields based on schema.txt [cite: MindShift/database-schema.txt]
+
+    @@map("comments")
+}
+
+// Minimal UserAchievement model for relation:
+model UserAchievement {
+    userAchievementId Int @id @default(autoincrement())
+    userId Int
+    achievementId Int // Relate to Achievement model later
+    achievedAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    // achievement Achievement @relation(...)
+
+     @@unique([userId, achievementId])
+     @@map("user_achievements")
+}
+
+ // Minimal Notification model for relation:
+model Notification {
+    notificationId Int @id @default(autoincrement())
+    userId Int
+    // ... other fields [cite: MindShift/database-schema.txt]
+
+    user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+    @@map("notifications")
+}
+
+ // Minimal Session model for relation:
+model Session {
+    sessionId String @id
+    userId Int
+    // ... other fields [cite: MindShift/database-schema.txt]
+
+    user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+    @@map("sessions")
+}
