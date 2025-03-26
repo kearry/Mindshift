@@ -1,17 +1,17 @@
+// src/app/api/topics/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from "next-auth/next";
-// import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Adjust if needed
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Import options
 
 const prisma = new PrismaClient();
 
-// --- POST function (existing code) ---
+// --- POST function (existing code, ensure authOptions import if needed) ---
 export async function POST(request: Request) {
-    // Check if user is authenticated
-    // const session = await getServerSession(authOptions);
-    const session = await getServerSession();
+    // Use configured authOptions
+    const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session || !session.user) { // Basic check, ID check might be redundant if session exists
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -42,31 +42,18 @@ export async function POST(request: Request) {
         console.error('Topic creation error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-    // Note: Removed prisma.$disconnect() from finally block here
-    // It's generally better to manage Prisma client instance lifecycle differently (e.g., singleton)
-    // For simplicity now, let's omit it in POST and GET handlers
 }
 
-
-// +++ Add GET function to fetch topics +++
-export async function GET(request: Request) {
+// +++ GET function - remove unused 'request' parameter +++
+export async function GET() { // Removed 'request: Request' parameter
     try {
         const topics = await prisma.topic.findMany({
-            where: {
-                isActive: true, // Optionally filter for active topics
-            },
-            orderBy: {
-                createdAt: 'desc', // Order by newest first
-            },
-            // Select specific fields if needed to reduce payload size
-            // select: { topicId: true, name: true, description: true, createdAt: true }
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
         });
-
         return NextResponse.json(topics);
-
     } catch (error) {
         console.error('Error fetching topics:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-    // Note: Prisma client disconnection management might be needed depending on deployment strategy
 }

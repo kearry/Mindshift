@@ -1,32 +1,29 @@
-import NextAuth from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcrypt'
+// src/app/api/auth/[...nextauth]/route.ts
+import NextAuth, { NextAuthOptions, User as NextAuthUser, Session } from "next-auth"; // Import Session
+import { JWT } from "next-auth/jwt";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { PrismaClient, User as PrismaUser } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
-            // The name to display on the sign in form (optional)
             name: "Credentials",
-            // `credentials` is used to generate a form on the built-in sign-in page.
-            // You can specify which fields should be submitted.
-            // We will use our own custom login form, so this is less important here.
             credentials: {
-                identifier: { label: "Username or Email", type: "text", placeholder: "jsmith@example.com" },
+                identifier: { label: "Username or Email", type: "text" },
                 password: { label: "Password", type: "password" }
             },
-            async authorize(credentials, req) {
-                // Add logic here to look up the user from the credentials supplied
+            // Removed unused 'req' parameter entirely
+            async authorize(credentials): Promise<NextAuthUser | null> {
                 if (!credentials?.identifier || !credentials.password) {
                     console.error("Missing credentials for authorization");
-                    return null; // Indicate failure
+                    return null;
                 }
 
-                let user = null;
+                let user: PrismaUser | null = null;
                 try {
-                    // Reuse the logic from your previous login API endpoint
                     user = await prisma.user.findFirst({
                         where: {
                             OR: [
@@ -37,41 +34,50 @@ const handler = NextAuth({
                     });
 
                     if (user && user.passwordHash) {
-                        // Check password
                         const isPasswordValid = await bcrypt.compare(credentials.password, user.passwordHash);
 
                         if (isPasswordValid) {
-                            // Any object returned will be saved in `user` property of the JWT / session
-                            // Return only necessary, non-sensitive user info
                             return {
-                                id: user.userId.toString(), // Must return id as string
+                                id: user.userId.toString(),
                                 name: user.username,
                                 email: user.email,
-                                // Add any other user properties needed in the session/token
                             };
                         } else {
                             console.error("Invalid password for user:", credentials.identifier);
-                            return null; // Password mismatch
+                            return null;
                         }
                     } else {
                         console.error("User not found:", credentials.identifier);
-                        return null; // User not found
+                        return null;
                     }
                 } catch (error) {
                     console.error("Authorize error:", error);
-                    return null; // Error during authorization
-                } finally {
-                    await prisma.$disconnect();
+                    return null;
                 }
             }
         })
-        // Add other providers like Google, GitHub etc. here later if needed
     ],
-    // Add other NextAuth options if needed:
-    // session: { strategy: "jwt" }, // or "database"
-    // pages: { signIn: '/login' }, // Redirect to your custom login page
-    // callbacks: { ... } // To customize session/token content
-});
+    callbacks: {
+        async jwt({ token, user }: { token: JWT; user?: NextAuthUser }): Promise<JWT> {
+            if (user?.id) {
+                token.id = user.id;
+            }
+            return token;
+        },
+        // Use the imported Session type from 'next-auth'
+        async session({ session, token }: { session: Session; token: JWT }): Promise<Session> {
+            // The type augmentation in src/types/next-auth.d.ts handles adding 'id' to session.user
+            if (token?.id && session?.user) {
+                session.user.id = token.id as string; // Type assertion might still be needed depending on setup
+            }
+            return session; // Return the Session type
+        },
+    },
+    session: {
+        strategy: "jwt"
+    },
+};
 
-// Export handlers for GET and POST requests
+const handler = NextAuth(authOptions);
+
 export { handler as GET, handler as POST };

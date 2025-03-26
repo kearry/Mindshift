@@ -10,25 +10,25 @@ datasource db {
   url      = env("DATABASE_URL") // Use environment variable
 }
 
-// Start defining your models based on database-schema.txt [cite: MindShift/database-schema.txt]
+// --- Models based on database-schema.txt [cite: MindShift/database-schema.txt] ---
 
 model User {
   userId          Int       @id @default(autoincrement())
   username        String    @unique
   email           String    @unique
-  passwordHash    String // Renamed from password_hash
-  displayName     String? // Renamed from display_name
+  passwordHash    String
+  displayName     String?
   bio             String?
-  profileImageUrl String? // Renamed from profile_image_url
-  totalPoints     Int       @default(0) // Renamed from total_points
+  profileImageUrl String?
+  totalPoints     Int       @default(0)
   rank            Int?
-  createdAt       DateTime  @default(now()) // Renamed from created_at
-  lastLogin       DateTime? // Renamed from last_login
-  isActive        Boolean   @default(true) // Renamed from is_active
-  isVerified      Boolean   @default(false) // Renamed from is_verified
-  isAdmin         Boolean   @default(false) // Renamed from is_admin
+  createdAt       DateTime  @default(now())
+  lastLogin       DateTime?
+  isActive        Boolean   @default(true)
+  isVerified      Boolean   @default(false)
+  isAdmin         Boolean   @default(false)
 
-  // Relations (add more as needed)
+  // Relations
   authProviders AuthProvider[]
   debates       Debate[]
   arguments     Argument[]
@@ -36,8 +36,9 @@ model User {
   achievements  UserAchievement[]
   notifications Notification[]
   sessions      Session[]
+  // Add relations for sponsored topics, follows etc. later
 
-  @@map("users") // Maps to the 'users' table
+  @@map("users")
 }
 
 model AuthProvider {
@@ -67,92 +68,120 @@ model Topic {
   updatedAt       DateTime @updatedAt
   isActive        Boolean  @default(true)
 
-  // Relations (add more as needed)
+  // Relations
   debates Debate[]
+  // Add relation for topic category mappings later
 
   @@map("topics")
 }
 
-// Add other models like Debate, Argument, Comment etc. here later based on schema.txt [cite: MindShift/database-schema.txt]
-// Minimal Debate model for relation:
+// Updated Debate model
 model Debate {
-  debateId Int @id @default(autoincrement())
-  topicId  Int
-  userId   Int
+  debateId      Int      @id @default(autoincrement())
+  topicId       Int
+  userId        Int
+  initialStance Float    // Stance of the topic when debate started
+  finalStance   Float?   // Stance when debate ends
+  goalDirection String   // 'left' or 'right'
+  pointsEarned  Float?
+  turnCount     Int      @default(0)
+  maxTurns      Int      @default(7) // Default from schema.txt [cite: MindShift/database-schema.txt]
+  status        String   @default("active") // e.g., 'active', 'completed', 'abandoned'
+  summaryArticle String?   @map("summary_article") // Explicit map for TEXT -> String
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+  isPublic      Boolean  @default(true)
 
-  topic Topic @relation(fields: [topicId], references: [topicId])
-  user  User  @relation(fields: [userId], references: [userId])
-
-  // ... other debate fields based on schema.txt [cite: MindShift/database-schema.txt]
+  topic     Topic      @relation(fields: [topicId], references: [topicId])
+  user      User       @relation(fields: [userId], references: [userId])
   arguments Argument[]
   comments  Comment[]
 
   @@map("debates")
 }
 
- // Minimal Argument model for relation:
 model Argument {
-    argumentId Int @id @default(autoincrement())
-    debateId Int
-    userId Int
+  argumentId    Int      @id @default(autoincrement())
+  debateId      Int
+  userId        Int      // User who made the argument
+  turnNumber    Int
+  argumentText  String   @map("argument_text") // Explicit map for TEXT -> String
+  aiResponse    String?  // AI's response to this argument
+  stanceBefore  Float    // Stance before this argument
+  stanceAfter   Float?   // Stance after this argument
+  stanceShift   Float?   // Calculated shift
+  shiftReasoning String?  @map("shift_reasoning") // Explicit map for TEXT -> String
+  createdAt     DateTime @default(now())
 
-    debate Debate @relation(fields: [debateId], references: [debateId])
-    user User @relation(fields: [userId], references: [userId])
+  debate Debate @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [userId]) // Assuming user relation needed
 
-    // ... other argument fields based on schema.txt [cite: MindShift/database-schema.txt]
-
-    @@map("arguments")
+  @@map("arguments")
 }
 
- // Minimal Comment model for relation:
 model Comment {
-    commentId Int @id @default(autoincrement())
-    debateId Int?
-    userId Int
-    parentId Int? @map("parent_comment_id")
+  commentId   Int      @id @default(autoincrement())
+  debateId    Int?     // Can be null if it's a reply to another comment? Schema implies CASCADE on debate though.
+  userId      Int
+  parentId    Int?     @map("parent_comment_id")
+  commentText String   @map("comment_text") // Explicit map for TEXT -> String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
 
-    debate Debate? @relation(fields: [debateId], references: [debateId])
-    user User @relation(fields: [userId], references: [userId])
-    parent Comment? @relation("CommentReplies", fields: [parentId], references: [commentId], onDelete: NoAction, onUpdate: NoAction)
-    replies Comment[] @relation("CommentReplies")
+  debate  Debate?  @relation(fields: [debateId], references: [debateId], onDelete: Cascade) // Cascade if debate deleted
+  user    User     @relation(fields: [userId], references: [userId]) // Set null if user deleted? Check requirements.
+  parent  Comment? @relation("CommentReplies", fields: [parentId], references: [commentId], onDelete: Cascade, onUpdate: NoAction) // Cascade delete replies
+  replies Comment[] @relation("CommentReplies")
 
-    // ... other comment fields based on schema.txt [cite: MindShift/database-schema.txt]
-
-    @@map("comments")
+  @@map("comments")
 }
 
-// Minimal UserAchievement model for relation:
+// Minimal UserAchievement model for relation - add Achievement model later
 model UserAchievement {
-    userAchievementId Int @id @default(autoincrement())
-    userId Int
-    achievementId Int // Relate to Achievement model later
-    achievedAt DateTime @default(now())
+  userAchievementId Int      @id @default(autoincrement())
+  userId            Int
+  achievementId     Int      // Relate to Achievement model later
+  achievedAt        DateTime @default(now())
 
-    user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-    // achievement Achievement @relation(...)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  // achievement Achievement @relation(...)
 
-     @@unique([userId, achievementId])
-     @@map("user_achievements")
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
 }
 
- // Minimal Notification model for relation:
+// Minimal Notification model for relation
 model Notification {
-    notificationId Int @id @default(autoincrement())
-    userId Int
-    // ... other fields [cite: MindShift/database-schema.txt]
+  notificationId   Int      @id @default(autoincrement())
+  userId           Int
+  notificationType String
+  content          String? @map("content") // Explicit map for TEXT -> String
+  relatedUserId    Int?
+  relatedDebateId  Int?
+  relatedCommentId Int?
+  isRead           Boolean  @default(false)
+  createdAt        DateTime @default(now())
 
-    user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  // Add relations for relatedUser, relatedDebate, relatedComment later
 
-    @@map("notifications")
+  @@map("notifications")
 }
 
- // Minimal Session model for relation:
+// Minimal Session model for relation (If using database sessions with next-auth)
 model Session {
-    sessionId String @id
-    userId Int
-    // ... other fields [cite: MindShift/database-schema.txt]
+  sessionId String   @id @map("session_id")
+  userId    Int
+  ipAddress String?
+  userAgent String? @map("user_agent") // Explicit map for TEXT -> String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
 
-    user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
-    @@map("sessions")
+  @@map("sessions")
 }
+
+// Add other models like TopicCategory, UserFollows, Reactions, etc., later as needed
