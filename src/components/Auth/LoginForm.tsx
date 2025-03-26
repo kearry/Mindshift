@@ -1,43 +1,46 @@
-'use client'; // Mark this as a Client Component
+'use client';
 
 import { useState, FormEvent } from 'react';
+import { signIn } from 'next-auth/react'; // Import signIn
+import { useRouter } from 'next/navigation'; // Import for redirection
 
 export default function LoginForm() {
-    const [identifier, setIdentifier] = useState(''); // Can be username or email
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
-    const [message, setMessage] = useState(''); // To display success/error messages
+    const [message, setMessage] = useState('');
+    const router = useRouter(); // Hook for redirection
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        setMessage(''); // Clear previous messages
+        setMessage('');
 
         try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ identifier, password }),
+            // Use signIn from next-auth
+            const result = await signIn('credentials', {
+                // Redirect false means we handle errors/success here, not auto-redirect
+                redirect: false,
+                identifier: identifier,
+                password: password,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                // Use error message from API response if available
-                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            if (result?.error) {
+                // Handle sign-in errors (e.g., invalid credentials)
+                setMessage(result.error === 'CredentialsSignin' ? 'Invalid credentials' : result.error);
+            } else if (result?.ok) {
+                // Handle successful sign-in
+                setMessage('Login successful! Redirecting...');
+                // Redirect to a dashboard or home page after successful login
+                router.push('/'); // Redirect to home page for example
+                // You might want router.refresh() as well depending on your setup
+            } else {
+                // Handle other unexpected cases
+                setMessage('An unexpected error occurred during login.');
             }
 
-            // TODO: Handle successful login (e.g., store token/session, redirect)
-            // For now, just display the success message from the API
-            setMessage(data.message || 'Login successful!');
-            // Optionally clear form or redirect user
-            setIdentifier('');
-            setPassword('');
-
-
-        } catch (error: any) {
-            console.error('Login failed:', error);
-            setMessage(`Login failed: ${error.message}`);
+        } catch (error) {
+            // Catch unexpected errors during the signIn process itself
+            console.error('Login submit error:', error);
+            setMessage('An error occurred. Please try again.');
         }
     };
 
@@ -48,7 +51,7 @@ export default function LoginForm() {
                 <label htmlFor="identifier" className="block text-sm font-medium text-gray-700">Username or Email</label>
                 <input
                     id="identifier"
-                    type="text" // Use text to allow either username or email
+                    type="text"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required
