@@ -1,21 +1,19 @@
 // src/lib/aiService.ts
 import OpenAI from 'openai';
-import { Argument, Debate, Topic, User } from '@prisma/client'; // Import necessary Prisma types
-import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-import { PrismaClient } from '@prisma/client'; // Import PrismaClient for summary saving
+import { Argument, PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient(); // Initialize Prisma client for saving summary
+const prisma = new PrismaClient();
 
-const openai = new OpenAI(); // Reads OPENAI_API_KEY from env automatically
+const openai = new OpenAI(); // Reads OPENAI_API_KEY from env
 const openaiModel = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
-const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || openaiModel; // Use same model if not specified
+const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || openaiModel;
 
 // --- Types for getAiDebateResponse ---
 export interface AiResponseInput {
     debateTopicName: string;
     stanceBefore: number;
     debateGoalDirection: string;
-    previousArguments: Argument[]; // Use full Argument type
+    previousArguments: Argument[];
     currentArgumentText: string;
     retrievedContext: string;
 }
@@ -38,92 +36,192 @@ export async function getAiDebateResponse(input: AiResponseInput): Promise<AiRes
     let shiftReasoning: string = "AI Error: Could not process response.";
 
     try {
-        // Build message history
-        const messages: ChatCompletionMessageParam[] = [
-            { role: "system", content: `You are debating topic "${debateTopicName}". Stance ${stanceBefore}/10. Goal <span class="math-inline">\{debateGoalDirection\}\. Context follows\.\\n</span>{retrievedContext}\nHistory:\n${previousArguments.map(arg => `User: ${arg.argumentText}\n${arg.aiResponse ? `Assistant: ${arg.aiResponse}\n` : ''}`).join('')}Evaluate latest user arg. Respond ONLY JSON: {"aiResponse": "...", "newStance": X.Y, "reasoning": "..."}` },
-            { role: "user", content: currentArgumentText }
-        ];
+        // Format previous arguments for context
+        const argumentHistory = previousArguments.map(arg => {
+            return `Turn ${arg.turnNumber}: User argument: ${arg.argumentText}\n` +
+                `${arg.aiResponse ? `AI response: ${arg.aiResponse}\n` : ''}` +
+                `${arg.stanceAfter ? `Stance change: ${arg.stanceBefore.toFixed(1)} → ${arg.stanceAfter.toFixed(1)}\n` : ''}`;
+        }).join('\n');
+
+        // Build system prompt with comprehensive context
+        const systemPrompt = `You are an AI debating the topic "${debateTopicName}".
+Your current stance is ${stanceBefore.toFixed(1)}/10 (0=fully supportive, 5=neutral, 10=fully opposed).
+The user is trying to move your stance ${debateGoalDirection} on the scale.
+
+RAG CONTEXT (retrieved from similar arguments):
+${retrievedContext}
+
+DEBATE HISTORY:
+${argumentHistory}
+
+INSTRUCTIONS:
+1. Consider the user's new argument and how compelling it is.
+2. Decide if and how much to shift your stance based on the merits of their argument.
+3. Respond with thoughtful, nuanced reasoning.
+4. You must return ONLY valid JSON with these fields:
+   - "aiResponse": your debate response text
+   - "newStance": your new stance as a number between 0-10
+   - "reasoning": explanation for why you shifted (or didn't shift) your stance
+
+Be fair but not too easy to persuade. Require good arguments to shift your position.`;
 
         console.log(`Calling OpenAI model ${openaiModel}...`);
         const completion = await openai.chat.completions.create({
             model: openaiModel,
-            messages: messages,
-            response_format: { type: "json_object" }
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: currentArgumentText }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
         });
 
-        const aiResult = JSON.parse(completion.choices[0]?.message?.content || '{}');
-        aiResponseText = aiResult.aiResponse || "[AI failed response text]";
-        let potentialStance = parseFloat(aiResult.newStance);
-        if (isNaN(potentialStance)) potentialStance = stanceBefore;
-        newStance = Math.max(0, Math.min(10, potentialStance));
+        // Parse and validate AI response
+        const content = completion.choices[0]?.message?.content || '{}';
+        const aiResult = JSON.parse(content);
+
+        // Get AI response text
+        aiResponseText = aiResult.aiResponse || "[AI failed to generate a response]";
+
+        // Get and validate new stance
+        const potentialStance = parseFloat(aiResult.newStance);
+        if (!isNaN(potentialStance)) {
+            newStance = Math.max(0, Math.min(10, potentialStance));
+        }
+
+        // Calculate stance shift
         stanceShift = newStance - stanceBefore;
-        shiftReasoning = aiResult.reasoning || "[AI failed reasoning]";
-        console.log(`OpenAI response: Stance ${stanceBefore} -> ${newStance}. Shift: ${stanceShift}.`);
+
+        // Get reasoning for the shift
+        shiftReasoning = aiResult.reasoning || "[No reasoning provided]";
+
+        console.log(`OpenAI response: Stance changed from ${stanceBefore} to ${newStance}. Shift: ${stanceShift.toFixed(2)}`);
 
     } catch (aiError: unknown) {
         console.error("OpenAI call failed in aiService:", aiError);
-        // Use default values defined above
         shiftReasoning = `AI Error: ${aiError instanceof Error ? aiError.message : 'Unknown AI error'}`;
     }
 
     return { aiResponseText, newStance, stanceShift, shiftReasoning };
 }
 
+// Define interface for user data when included with arguments
+interface ArgumentWithUser extends Argument {
+    user?: {
+        displayName?: string | null;
+        username?: string;
+    } | null;
+}
 
-// --- Types for generateAndSaveSummary ---
-// Define required types inline or import if needed elsewhere
-type SummaryUserType = Pick<User, 'displayName' | 'username'>;
-type SummaryArgumentType = Pick<Argument, 'turnNumber' | 'argumentText' | 'aiResponse' | 'stanceBefore' | 'stanceAfter' | 'shiftReasoning'> & { user: SummaryUserType | null };
-// Define type for input data needed by summary function
-interface SummaryInputData {
+// Define interface for summary input data
+export interface SummaryInputData {
     debateId: number;
     topicName: string;
     initialStance: number;
     goalDirection: string;
     pointsEarned: number | null;
-    arguments: SummaryArgumentType[];
+    arguments: Argument[];
+    finalStance: number;
 }
 
 // --- Function to Generate and Save Summary ---
 export async function generateAndSaveSummary(inputData: SummaryInputData): Promise<void> {
-    const { debateId, topicName, initialStance, goalDirection, pointsEarned, arguments: args } = inputData;
+    const { debateId, topicName, initialStance, goalDirection, pointsEarned, arguments: args, finalStance } = inputData;
+
     console.log(`Generating summary for completed debate ${debateId}...`);
+
     try {
-        const finalStance = args[args.length - 1]?.stanceAfter ?? initialStance;
+        // Format argument history for summary generation
+        let summaryHistory = `Debate Topic: "${topicName}"
+Initial AI Stance: ${initialStance.toFixed(1)}/10
+User Goal: Shift stance ${goalDirection}
+Final AI Stance: ${finalStance.toFixed(1)}/10
+Points Earned by User: ${pointsEarned?.toFixed(1) ?? '0'}
+Number of Turns: ${args.length}
 
-        // Construct history string
-        let summaryHistory = `Debate Topic: ${topicName}\nInitial AI Stance: ${initialStance.toFixed(1)}/10\nUser Goal: Shift Stance ${goalDirection}\n\nArgument History:\n`;
-        args.forEach(arg => { summaryHistory += `T${arg.turnNumber}(User:<span class="math-inline">\{arg\.user?\.displayName\|\|'U'\}\)\:</span>{arg.argumentText}\n`; if (arg.aiResponse) { summaryHistory += `AI(Stance <span class="math-inline">\{arg\.stanceBefore\.toFixed\(1\)\}\-\></span>{arg.stanceAfter?.toFixed(1)}):${arg.aiResponse}\n`; if (arg.shiftReasoning) summaryHistory += `Rsn:${arg.shiftReasoning}\n`; } summaryHistory += "\n"; });
-        summaryHistory += `Final AI Stance: ${finalStance.toFixed(1)}/10\nPoints Earned by User: ${pointsEarned?.toFixed(1) ?? 0}\n`;
+ARGUMENT HISTORY:`;
 
-        // Call LLM
+        // Add each argument and response to the history
+        args.forEach(arg => {
+            // Check if arg has user property and cast if needed
+            const argWithUser = arg as unknown as ArgumentWithUser;
+            const username = argWithUser.user ?
+                (argWithUser.user.displayName || argWithUser.user.username || 'User') : 'User';
+
+            summaryHistory += `\n\nTurn ${arg.turnNumber} (${username}):\n${arg.argumentText}`;
+
+            if (arg.aiResponse) {
+                summaryHistory += `\n\nAI Response (Stance ${arg.stanceBefore.toFixed(1)} → ${arg.stanceAfter?.toFixed(1) || arg.stanceBefore.toFixed(1)}):\n${arg.aiResponse}`;
+
+                if (arg.shiftReasoning) {
+                    summaryHistory += `\n\nReasoning for stance shift: ${arg.shiftReasoning}`;
+                }
+            }
+        });
+
+        // System prompt for summary generation
+        const systemPrompt = `You are an AI assistant writing an analytical summary of a completed debate. 
+Your task is to create a well-structured summary article that:
+
+1. Introduces the debate topic and the initial positions
+2. Highlights the key arguments made by the user
+3. Explains how and why the AI's stance shifted during the debate
+4. Analyzes the most persuasive points and their impact
+5. Provides a thoughtful conclusion about the overall effectiveness of the debate
+
+Focus on the substance of the arguments rather than mechanics. Identify logical patterns, 
+rhetorical strategies, and the evolution of the discussion. Write in a balanced, analytical tone.`;
+
+        // Call OpenAI for summary generation
+        console.log(`Calling OpenAI model ${summaryModel} for summary generation...`);
         const completion = await openai.chat.completions.create({
-            model: summaryModel, // Use separate model if defined
+            model: summaryModel,
             messages: [
-                { role: "system", content: `You are an AI assistant writing an analytical summary... Focus on final stance reasoning, opposing views, influential arguments...` /* Shortened Prompt */ },
+                { role: "system", content: systemPrompt },
                 { role: "user", content: summaryHistory }
             ],
-            temperature: 0.6
+            temperature: 0.7,
+            max_tokens: 1500
         });
+
         const summaryText = completion.choices[0]?.message?.content?.trim() || "[Summary generation failed]";
 
-        // Save summary using Prisma client initialized in this file
+        // Save summary to database
         await prisma.debate.update({
             where: { debateId },
-            data: { status: 'completed', completedAt: new Date(), summaryArticle: summaryText, finalStance: finalStance }
+            data: {
+                status: 'completed',
+                completedAt: new Date(),
+                summaryArticle: summaryText,
+                finalStance: finalStance
+            }
         });
-        console.log(`Summary saved for debate ${debateId}.`);
+
+        console.log(`Summary successfully saved for debate ${debateId}.`);
+
     } catch (error: unknown) {
         console.error(`Failed to generate or save summary for debate ${debateId}:`, error);
+
         try {
-            // Attempt to mark as failed, get final stance if possible
-            const lastArg = await prisma.argument.findFirst({ where: { debateId }, orderBy: { turnNumber: 'desc' } });
-            await prisma.debate.update({ where: { debateId }, data: { status: 'summary_failed', completedAt: new Date(), finalStance: lastArg?.stanceAfter } });
+            // Mark debate as having failed summary generation but still completed
+            const lastArg = await prisma.argument.findFirst({
+                where: { debateId },
+                orderBy: { turnNumber: 'desc' }
+            });
+
+            await prisma.debate.update({
+                where: { debateId },
+                data: {
+                    status: 'summary_failed',
+                    completedAt: new Date(),
+                    finalStance: lastArg?.stanceAfter
+                }
+            });
+
+            console.log(`Marked debate ${debateId} as 'summary_failed'.`);
+
         } catch (updateError) {
             console.error(`Failed to update debate status after summary failure for debate ${debateId}:`, updateError);
         }
-    } finally {
-        // Handle prisma client connection if needed, e.g., in serverless environments
-        // await prisma.$disconnect();
     }
 }

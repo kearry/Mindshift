@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import Header from "@/components/Header";
-import { ThemeProvider } from "@/components/ThemeProvider"; // Import the new ThemeProvider
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,17 +18,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* Add suppressHydrationWarning for next-themes */}
-      <body className={inter.className}>
-        {/* Wrap SessionProviderWrapper with ThemeProvider */}
+    <html lang="en" suppressHydrationWarning>
+      {/* Add base dark mode styles to body */}
+      <body className={`${inter.className} bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange // Optional: disable CSS transitions when changing themes
+          disableTransitionOnChange
         >
           <SessionProviderWrapper>
             <Header />
+            {/* Remove container/padding from main if you want full-width bg */}
             <main className="container mx-auto p-4">
               {children}
             </main>
