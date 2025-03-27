@@ -1,16 +1,12 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite" // Change provider to sqlite
-  url      = env("DATABASE_URL") // Use environment variable
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
-
-// --- Models based on database-schema.txt [cite: MindShift/database-schema.txt] ---
 
 model User {
   userId          Int       @id @default(autoincrement())
@@ -36,20 +32,38 @@ model User {
   achievements  UserAchievement[]
   notifications Notification[]
   sessions      Session[]
-  // Add relations for sponsored topics, follows etc. later
+
+  // --- Added Following/Followers Relations ---
+  following     UserFollows[] @relation("UserFollowing") // Users this user is following
+  followers     UserFollows[] @relation("UserFollowers") // Users following this user
+  // -----------------------------------------
 
   @@map("users")
 }
 
+// --- New UserFollows Model ---
+model UserFollows {
+  followId    Int      @id @default(autoincrement())
+  followerId  Int      // ID of the user doing the following
+  followedId  Int      // ID of the user being followed
+  createdAt   DateTime @default(now())
+
+  // Relations to User model
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [userId], onDelete: Cascade)
+  followed    User     @relation("UserFollowers", fields: [followedId], references: [userId], onDelete: Cascade)
+
+  @@unique([followerId, followedId]) // Ensure a user can only follow another user once
+  @@map("user_follows")
+}
+// ---------------------------
+
 model AuthProvider {
   providerId     Int      @id @default(autoincrement())
   userId         Int
-  providerName   String   // 'google', 'github', etc.
+  providerName   String
   providerUserId String
   createdAt      DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
+  user           User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   @@unique([providerName, providerUserId])
   @@map("auth_providers")
 }
@@ -58,130 +72,108 @@ model Topic {
   topicId         Int      @id @default(autoincrement())
   name            String
   description     String?
-  category        String?  // Consider relating this to a Category model later
+  category        String?
   isSponsored     Boolean  @default(false)
-  sponsorId       Int?     // Consider relating this to User later
-  currentStance   Float    // Prisma uses Float for DECIMAL
+  sponsorId       Int?
+  currentStance   Float
   stanceReasoning String?
   debateCount     Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   isActive        Boolean  @default(true)
-
-  // Relations
-  debates Debate[]
-  // Add relation for topic category mappings later
-
+  debates         Debate[]
   @@map("topics")
 }
 
-// Updated Debate model
 model Debate {
   debateId      Int      @id @default(autoincrement())
   topicId       Int
   userId        Int
-  initialStance Float    // Stance of the topic when debate started
-  finalStance   Float?   // Stance when debate ends
-  goalDirection String   // 'left' or 'right'
+  initialStance Float
+  finalStance   Float?
+  goalDirection String
   pointsEarned  Float?
   turnCount     Int      @default(0)
-  maxTurns      Int      @default(7) // Default from schema.txt [cite: MindShift/database-schema.txt]
-  status        String   @default("active") // e.g., 'active', 'completed', 'abandoned'
-  summaryArticle String?   @map("summary_article") // Explicit map for TEXT -> String
+  maxTurns      Int      @default(7)
+  status        String   @default("active")
+  summaryArticle String?   @map("summary_article")
   createdAt     DateTime @default(now())
   completedAt   DateTime?
   isPublic      Boolean  @default(true)
-
-  topic     Topic      @relation(fields: [topicId], references: [topicId])
-  user      User       @relation(fields: [userId], references: [userId])
-  arguments Argument[]
-  comments  Comment[]
-
+  topic         Topic    @relation(fields: [topicId], references: [topicId])
+  user          User     @relation(fields: [userId], references: [userId])
+  arguments     Argument[]
+  comments      Comment[]
   @@map("debates")
 }
 
 model Argument {
   argumentId    Int      @id @default(autoincrement())
   debateId      Int
-  userId        Int      // User who made the argument
+  userId        Int
   turnNumber    Int
-  argumentText  String   @map("argument_text") // Explicit map for TEXT -> String
-  aiResponse    String?  // AI's response to this argument
-  stanceBefore  Float    // Stance before this argument
-  stanceAfter   Float?   // Stance after this argument
-  stanceShift   Float?   // Calculated shift
-  shiftReasoning String?  @map("shift_reasoning") // Explicit map for TEXT -> String
+  argumentText  String   @map("argument_text")
+  aiResponse    String?
+  stanceBefore  Float
+  stanceAfter   Float?
+  stanceShift   Float?
+  shiftReasoning String?  @map("shift_reasoning")
   createdAt     DateTime @default(now())
-
-  debate Debate @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [userId]) // Assuming user relation needed
-
+  debate        Debate   @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [userId])
   @@map("arguments")
 }
 
 model Comment {
   commentId   Int      @id @default(autoincrement())
-  debateId    Int?     // Can be null if it's a reply to another comment? Schema implies CASCADE on debate though.
+  debateId    Int?
   userId      Int
   parentId    Int?     @map("parent_comment_id")
-  commentText String   @map("comment_text") // Explicit map for TEXT -> String
+  commentText String   @map("comment_text")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   isDeleted   Boolean  @default(false)
-
-  debate  Debate?  @relation(fields: [debateId], references: [debateId], onDelete: Cascade) // Cascade if debate deleted
-  user    User     @relation(fields: [userId], references: [userId]) // Set null if user deleted? Check requirements.
-  parent  Comment? @relation("CommentReplies", fields: [parentId], references: [commentId], onDelete: Cascade, onUpdate: NoAction) // Cascade delete replies
-  replies Comment[] @relation("CommentReplies")
-
+  debate      Debate?  @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [userId])
+  parent      Comment? @relation("CommentReplies", fields: [parentId], references: [commentId], onDelete: Cascade, onUpdate: NoAction)
+  replies     Comment[] @relation("CommentReplies")
   @@map("comments")
 }
 
-// Minimal UserAchievement model for relation - add Achievement model later
 model UserAchievement {
   userAchievementId Int      @id @default(autoincrement())
   userId            Int
-  achievementId     Int      // Relate to Achievement model later
+  achievementId     Int
   achievedAt        DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  // achievement Achievement @relation(...)
-
+  user              User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  // achievement Achievement @relation(...) // Add Achievement model later
   @@unique([userId, achievementId])
   @@map("user_achievements")
 }
 
-// Minimal Notification model for relation
 model Notification {
   notificationId   Int      @id @default(autoincrement())
   userId           Int
   notificationType String
-  content          String? @map("content") // Explicit map for TEXT -> String
+  content          String? @map("content")
   relatedUserId    Int?
   relatedDebateId  Int?
   relatedCommentId Int?
   isRead           Boolean  @default(false)
   createdAt        DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   // Add relations for relatedUser, relatedDebate, relatedComment later
-
   @@map("notifications")
 }
 
-// Minimal Session model for relation (If using database sessions with next-auth)
 model Session {
   sessionId String   @id @map("session_id")
   userId    Int
   ipAddress String?
-  userAgent String? @map("user_agent") // Explicit map for TEXT -> String
+  userAgent String? @map("user_agent")
   createdAt DateTime @default(now())
   expiresAt DateTime
   isActive  Boolean  @default(true)
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   @@map("sessions")
 }
-
-// Add other models like TopicCategory, UserFollows, Reactions, etc., later as needed
