@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
-import Header from "@/components/Header"; // Import the Header component
+import Header from "@/components/Header";
+import { ThemeProvider } from "@/components/ThemeProvider"; // Import the new ThemeProvider
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,14 +18,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning> {/* Add suppressHydrationWarning for next-themes */}
       <body className={inter.className}>
-        <SessionProviderWrapper>
-          <Header /> {/* Add the Header component here */}
-          <main className="container mx-auto p-4"> {/* Optional main content wrapper */}
-            {children}
-          </main>
-        </SessionProviderWrapper>
+        {/* Wrap SessionProviderWrapper with ThemeProvider */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange // Optional: disable CSS transitions when changing themes
+        >
+          <SessionProviderWrapper>
+            <Header />
+            <main className="container mx-auto p-4">
+              {children}
+            </main>
+          </SessionProviderWrapper>
+        </ThemeProvider>
       </body>
     </html>
   );
