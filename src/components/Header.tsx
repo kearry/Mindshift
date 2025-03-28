@@ -20,6 +20,12 @@ export default function Header() {
 
     // Theme handling
     const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+
+    // After mounting, we can safely show the UI that depends on client-side data
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Fetch notifications
     useEffect(() => {
@@ -95,13 +101,14 @@ export default function Header() {
                 <div className="flex items-center space-x-4">
                     <Link href="/leaderboard" className="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">Leaderboard</Link>
 
-                    {/* Theme Toggle */}
+                    {/* Theme Toggle - only show icon after component is mounted */}
                     <button
                         onClick={toggleTheme}
                         className="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
                         aria-label="Toggle theme"
+                        suppressHydrationWarning
                     >
-                        {theme === 'dark' ? '🌞' : '🌙'}
+                        {mounted && (theme === 'dark' ? '🌞' : '🌙')}
                     </button>
 
                     {loadingSession && <span>Loading...</span>}
