@@ -34,6 +34,7 @@ const RAG_RETRIEVAL_COUNT = parseInt(process.env.RAG_RETRIEVAL_COUNT || '3', 10)
 // In production you would use a proper embedding model
 async function generateEmbedding(text: string): Promise<number[]> {
     // Create a simple mock embedding (in real app, use a proper model)
+    console.log(`Generating mock embedding for text: ${text}`);
     return Array(384).fill(0).map(() => Math.random() - 0.5);
 }
 
@@ -60,16 +61,22 @@ async function retrieveRelevantContext(queryText: string, topicId: number): Prom
             .limit(RAG_RETRIEVAL_COUNT);
 
         // Collect search results
-        const results: any[] = [];
+        type SearchResult = {
+            text?: string;
+            _distance?: number;
+            [key: string]: unknown;
+        };
+
+        const results: SearchResult[] = [];
         for await (const record of searchQuery) {
-            results.push(record);
+            results.push(record as unknown as SearchResult);
         }
 
         if (results.length > 0) {
             const context = "Relevant context from past arguments:\n" +
                 results.map((record, index) => {
-                    const text = typeof record.text === 'string' ? record.text : '';
-                    return `[${index + 1}] ${text.substring(0, 300)}${text.length > 300 ? '...' : ''}`;
+                    const recordText = typeof record.text === 'string' ? record.text : '';
+                    return `[${index + 1}] ${recordText.substring(0, 300)}${recordText.length > 300 ? '...' : ''}`;
                 }).join('\n\n');
 
             return context;

@@ -43,7 +43,6 @@ export default function DebatePage() {
     const debateId = parseInt(debateIdStr ?? '', 10);
 
     // Fetch debate and comments data
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const fetchDebateAndComments = useCallback(async (fetchComments = true) => {
         if (!loading) setLoading(true);
         setError(null);
