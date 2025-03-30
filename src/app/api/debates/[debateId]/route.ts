@@ -4,7 +4,7 @@ import { PrismaClient, Argument } from '@prisma/client';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// Import functions from service files
+// Import functions from service files - REMOVED RAG IMPORT
 import { getAiDebateResponse, generateAndSaveSummary, AiResponseInput } from '@/lib/aiService';
 
 const prisma = new PrismaClient();
@@ -214,6 +214,8 @@ export async function POST(request: Request, context: RouteContext) {
                     shiftReasoning: shiftReasoning
                 }
             });
+
+            // REMOVED Vector Embedding Code
 
             // Check if debate has ended
             const turnCountAfterAI = currentTurnCountAfterUser + 1;

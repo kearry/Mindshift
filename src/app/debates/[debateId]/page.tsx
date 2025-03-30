@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, FormEvent, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { Topic, User, Argument, Debate, Comment } from '@prisma/client';
 import DebateHeader from '@/components/Debates/DebateHeader';
 import StanceIndicator from '@/components/Debates/StanceIndicator';
@@ -99,22 +100,25 @@ export default function DebatePage() {
         }
     }, [debateId]);
 
-    // Initial fetch with refresh interval
+    // Initial fetch with polling for active debates
     useEffect(() => {
         if (debateIdStr) {
+            // Initial fetch
             fetchDebateAndComments(true);
 
-            // Set up a refresh interval for active debates
+            // Set up polling for active debates
             let refreshInterval: NodeJS.Timeout | null = null;
 
-            if (debate && debate.status === 'active') {
+            // Only set up polling if debate is active, but don't add debate to dependencies
+            // This avoids the infinite fetch loop
+            if (debate?.status === 'active') {
                 refreshInterval = setInterval(() => {
-                    // Only refresh debate data, not comments
+                    // Only refresh debate data, not comments to reduce load
                     fetchDebateAndComments(false);
                 }, 10000); // Check every 10 seconds
             }
 
-            // Clean up the interval when component unmounts
+            // Clean up interval on unmount
             return () => {
                 if (refreshInterval) {
                     clearInterval(refreshInterval);
@@ -124,7 +128,40 @@ export default function DebatePage() {
             setError("Debate ID missing");
             setLoading(false);
         }
-    }, [debateIdStr, fetchDebateAndComments, debate?.status]);
+    }, [debateIdStr, fetchDebateAndComments]); // IMPORTANT: debate is NOT a dependency
+
+    // Submit argument handler
+    const handleArgumentSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const formData = new FormData(form);
+        const argumentText = formData.get('argumentText') as string;
+
+        if (!argumentText?.trim() || isNaN(debateId)) return;
+
+        try {
+            const baseUrl = window.location.origin;
+            const response = await fetch(`${baseUrl}/api/debates/${debateId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ argumentText: argumentText.trim() }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to submit argument');
+            }
+
+            // Refetch after successful submission
+            await fetchDebateAndComments(true);
+
+            // Reset form
+            form.reset();
+        } catch (err: unknown) {
+            console.error("Submit argument error:", err);
+            setError(err instanceof Error ? err.message : "Could not submit argument");
+        }
+    };
 
     if (loading || sessionStatus === 'loading') return <p className="text-center mt-10">Loading debate...</p>;
     if (error) return <p className="text-center text-red-600 mt-10">Error: {error}</p>;

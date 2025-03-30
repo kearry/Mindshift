@@ -1,9 +1,9 @@
 interface Props {
     summaryArticle: string | null;
-    status: string;
+    status: string; // Needed for future conditional rendering
 }
 
-export default function DebateSummary({ summaryArticle, status }: Props) {
+export default function DebateSummary({ summaryArticle }: Props) {
     if (!summaryArticle) {
         return <p className="text-center italic text-gray-500 mt-4">Summary is being generated or failed...</p>;
     }

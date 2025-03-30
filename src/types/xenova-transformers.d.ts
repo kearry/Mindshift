@@ -1,43 +1,91 @@
-// src/types/xenova-transformers.d.ts
+// scripts/initialize-vector-db.ts
+// Run with: npx ts-node scripts/initialize-vector-db.ts
+import * as lancedb from '@lancedb/lancedb';
+import * as fs from 'fs';
+import * as path from 'path';
+import { pipeline } from '@xenova/transformers';
+import type { FeatureExtractionOutput } from '@xenova/transformers';
 
-/**
- * Type declarations for @xenova/transformers
- * This overrides the broken definitions in the package
- */
-declare module '@xenova/transformers' {
-    /**
-     * Result of a feature extraction pipeline
-     */
-    export interface FeatureExtractionOutput {
-        data: Float32Array;
-        dims: number[];
-        [key: string]: unknown;
+// Configuration
+const vectorDbPath = process.env.VECTOR_DB_PATH || 'data/lancedb';
+const vectorTableName = process.env.VECTOR_TABLE_NAME || 'mindshift_vectors';
+const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
+
+// Generate a proper embedding for the placeholder
+async function generatePlaceholderEmbedding(): Promise<number[]> {
+    try {
+        console.log(`Loading embedding model: ${MODEL_NAME}`);
+        const model = await pipeline('feature-extraction', MODEL_NAME, {
+            quantized: false
+        });
+
+        const placeholderText = "This is a placeholder entry to initialize the vector database for the MindShift application.";
+        console.log("Generating embedding for placeholder text");
+
+        const output = await model(placeholderText, {
+            pooling: 'mean',
+            normalize: true
+        }) as FeatureExtractionOutput;
+
+        // Convert to regular array
+        if (output && output.data && output.data instanceof Float32Array) {
+            return Array.from(output.data);
+        }
+
+        throw new Error("Model output doesn't contain expected data format");
+    } catch (error) {
+        console.error("Failed to generate embedding:", error);
+        console.log("Falling back to zero vector");
+        // Fallback to zero vector with correct dimensions for the model
+        return new Array(384).fill(0);
+    }
+}
+
+async function initializeVectorDb() {
+    console.log('Initializing vector database...');
+
+    // Create directory if it doesn't exist
+    const dbDir = path.resolve(process.cwd(), vectorDbPath);
+    if (!fs.existsSync(dbDir)) {
+        console.log(`Creating database directory: ${dbDir}`);
+        fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    /**
-     * Generic pipeline return type
-     */
-    export type PipelineOutput = FeatureExtractionOutput | Record<string, unknown>;
+    try {
+        // Connect to LanceDB
+        const db = await lancedb.connect(vectorDbPath);
 
-    /**
-     * Generic pipeline function type
-     */
-    export type PipelineFunction = (text: string, options?: Record<string, unknown>) => Promise<PipelineOutput>;
+        // Check if table already exists
+        const tableNames = await db.tableNames();
 
-    /**
-     * Creates a new pipeline for the specified task.
-     * @param task - The task to be performed (e.g., 'feature-extraction')
-     * @param model - The model to use for the task (e.g., 'Xenova/all-MiniLM-L6-v2')
-     * @param options - Additional options for the pipeline
-     * @returns A pipeline function that can be called with input data
-     */
-    export function pipeline(
-        task: string,
-        model: string,
-        options?: {
-            quantized?: boolean;
-            progress_callback?: (progress: unknown) => void;
-            [key: string]: unknown;
+        if (tableNames.includes(vectorTableName)) {
+            console.log(`Vector table '${vectorTableName}' already exists.`);
+        } else {
+            // Generate a proper embedding for the placeholder
+            const placeholderVector = await generatePlaceholderEmbedding();
+            console.log(`Generated embedding with ${placeholderVector.length} dimensions`);
+
+            // Create a starter table with a placeholder vector
+            const sampleData = [{
+                vector: placeholderVector,
+                text: 'Placeholder entry - initialization record',
+                argumentId: 0,
+                debateId: 0,
+                topicId: 0,
+                turnNumber: 0
+            }];
+
+            console.log(`Creating vector table '${vectorTableName}'...`);
+            await db.createTable(vectorTableName, sampleData);
+            console.log('Table created successfully with placeholder entry.');
         }
-    ): Promise<PipelineFunction>;
+
+        console.log('Vector database is ready!');
+    } catch (error) {
+        console.error('Error initializing vector database:', error);
+        process.exit(1);
+    }
 }
+
+// Run the initialization function
+initializeVectorDb().catch(console.error);
