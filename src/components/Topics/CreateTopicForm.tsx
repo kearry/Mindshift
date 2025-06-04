@@ -3,6 +3,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLLMSettings } from '@/components/LLMSettingsContext';
 // Auth check is done on the API side
 
 export default function CreateTopicForm() {
@@ -11,6 +12,7 @@ export default function CreateTopicForm() {
     const [category, setCategory] = useState('');
     const [message, setMessage] = useState('');
     const router = useRouter();
+    const { provider, model } = useLLMSettings();
 
     // No need for client-side session check if API requires auth
     // const { status } = useSession();
@@ -25,7 +27,13 @@ export default function CreateTopicForm() {
             const response = await fetch('/api/topics', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, description, category }),
+                body: JSON.stringify({
+                    name,
+                    description,
+                    category,
+                    llmProvider: provider,
+                    llmModel: model
+                }),
             });
             const data = await response.json();
             if (!response.ok) {

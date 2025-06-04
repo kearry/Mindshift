@@ -13,11 +13,6 @@ const defaultOpenAIModel = process.env.OPENAI_MODEL_NAME || 'gpt-4o-mini';
 const defaultLLMModel = process.env.DEFAULT_LLM_MODEL || defaultOpenAIModel;
 const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || defaultOpenAIModel;
 
-// Defaults specifically for topic creation
-const topicLLMProvider = process.env.TOPIC_LLM_PROVIDER === 'ollama'
-    ? 'ollama'
-    : defaultLLMProvider;
-const topicLLMModel = process.env.TOPIC_LLM_MODEL || defaultLLMModel;
 
 // --- Types for getAiInitialStance ---
 export interface InitialStanceInput {
@@ -41,8 +36,8 @@ export async function getAiInitialStance(
     const {
         topicName,
         topicDescription,
-        llmProvider = topicLLMProvider,
-        llmModel = topicLLMModel
+        llmProvider = defaultLLMProvider,
+        llmModel = defaultLLMModel
     } = input;
 
     let stance = 5.0;

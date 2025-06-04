@@ -4,6 +4,7 @@ import "./globals.css";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import Header from "@/components/Header";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { LLMSettingsProvider } from "@/components/LLMSettingsContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,13 +28,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SessionProviderWrapper>
-            <Header />
-            {/* Remove container/padding from main if you want full-width bg */}
-            <main className="container mx-auto p-4">
-              {children}
-            </main>
-          </SessionProviderWrapper>
+          <LLMSettingsProvider>
+            <SessionProviderWrapper>
+              <Header />
+              {/* Remove container/padding from main if you want full-width bg */}
+              <main className="container mx-auto p-4">
+                {children}
+              </main>
+            </SessionProviderWrapper>
+          </LLMSettingsProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -24,12 +24,12 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 Create a `.env` file based on the provided `.env.example`. Key variables include:
 
-- `DEFAULT_LLM_PROVIDER` – initial provider for AI interactions (`openai` or `ollama`)
-- `DEFAULT_LLM_MODEL` – default model name used when no selection is made
-- `TOPIC_LLM_PROVIDER` – provider used when generating a topic's initial stance
-- `TOPIC_LLM_MODEL` – model name used for topic creation
+- `DEFAULT_LLM_PROVIDER` – provider used for both topic creation and debates (`openai` or `ollama`)
+- `DEFAULT_LLM_MODEL` – model name used when no specific model is selected
 
 Other variables configure OpenAI credentials, Ollama connection and database paths. See `.env.example` for the full list.
+
+The selected provider and model can also be changed globally from the **AI Settings** menu in the header. These settings apply to both topic creation and debates.
 
 ## Learn More
 

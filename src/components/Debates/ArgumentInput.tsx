@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import LLMSelector from '@/components/LLMSelector';
+import { useLLMSettings } from '@/components/LLMSettingsContext';
 
 interface Props {
     isMyTurn: boolean;
@@ -22,10 +23,11 @@ export default function ArgumentInput({
     const [currentArgument, setCurrentArgument] = useState('');
     const [isSubmittingArgument, setIsSubmittingArgument] = useState(false);
     const [argumentSubmitMessage, setArgumentSubmitMessage] = useState('');
+    const { provider, model } = useLLMSettings();
 
     // Added LLM selection state
-    const [selectedProvider, setSelectedProvider] = useState<'openai' | 'ollama'>('openai');
-    const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
+    const [selectedProvider, setSelectedProvider] = useState<'openai' | 'ollama'>(provider);
+    const [selectedModel, setSelectedModel] = useState<string>(model);
 
     const handleModelSelect = (provider: 'openai' | 'ollama', model: string) => {
         setSelectedProvider(provider);
