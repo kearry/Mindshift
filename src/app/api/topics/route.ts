@@ -1,18 +1,17 @@
+// src/app/api/topics/route.ts
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Import options
-import OpenAI from 'openai'; // Import OpenAI
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import OpenAI from 'openai';
+import { getInitialStanceSystemPrompt, getInitialStanceUserMessage } from '@/lib/prompts/initialStancePrompt';
 
 const prisma = new PrismaClient();
-const openai = new OpenAI(); // Initialize OpenAI client
-
-// Read model name from environment variable, default to gpt-4o-mini
+const openai = new OpenAI();
 const openaiModel = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
 
-// --- POST function (Updated with Initial Stance AI Call) ---
+// --- POST function (Saves scaleDefinitions if valid) ---
 export async function POST(request: Request) {
-    // Check Authentication
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -28,43 +27,39 @@ export async function POST(request: Request) {
         const topicName = name.trim();
         const topicDescription = (typeof description === 'string' && description.trim().length > 0) ? description.trim() : null;
 
-
-        // --- Call OpenAI for Initial Stance ---
-        let initialStance: number = 5.0; // Default stance
-        let stanceReasoning: string = "Default neutral stance assigned."; // Default reasoning
+        // --- Call OpenAI ---
+        let initialStance: number = 5.0;
+        let stanceReasoning: string = "Default neutral stance assigned.";
+        let scaleDefs: Prisma.JsonValue | null = null;
 
         try {
             console.log(`Calling OpenAI model ${openaiModel} for initial stance on topic: "${topicName}"`);
+            const systemPrompt = getInitialStanceSystemPrompt();
+            const userMessage = getInitialStanceUserMessage(topicName, topicDescription);
+
             const completion = await openai.chat.completions.create({
                 model: openaiModel,
-                messages: [
-                    {
-                        role: "system",
-                        content: `Analyze the following topic and determine your initial stance on it using a scale of 0 to 10, where 0 means completely supportive/in favor, 5 means neutral, and 10 means completely opposed/against. Provide detailed reasoning for your stance. Respond ONLY with a valid JSON object containing two keys: "stance" (a number between 0 and 10) and "reasoning" (a string explaining your position).`
-                    },
-                    {
-                        role: "user",
-                        content: `Topic: ${topicName}${topicDescription ? `\nDescription: ${topicDescription}` : ''}`
-                    }
-                ],
+                messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
                 response_format: { type: "json_object" }
             });
 
-            const aiResult = JSON.parse(completion.choices[0]?.message?.content || '{}');
+            const content = completion.choices[0]?.message?.content;
+            console.log("Raw OpenAI Response:", content);
 
+            let aiResult: { stance?: number; reasoning?: string; scaleDefinitions?: Record<string, string> } = {};
+            if (content) {
+                try { aiResult = JSON.parse(content); }
+                catch (parseError) { console.error("Failed to parse OpenAI JSON response:", parseError); }
+            } else { console.warn("OpenAI response content was null or empty."); }
+
+            // Extract stance
             if (typeof aiResult.stance === 'number') {
-                const potentialStance = parseFloat(aiResult.stance);
-                // Validate and clamp stance
-                if (!isNaN(potentialStance)) {
-                    initialStance = Math.max(0, Math.min(10, potentialStance));
-                    console.log(`OpenAI returned initial stance: ${initialStance}`);
-                } else {
-                    console.warn(`OpenAI returned non-numeric stance: ${aiResult.stance}. Using default.`);
-                }
-            } else {
-                console.warn("OpenAI response did not contain a numeric 'stance'. Using default.");
-            }
+                const potentialStance = parseFloat(aiResult.stance.toString());
+                if (!isNaN(potentialStance)) { initialStance = Math.max(0, Math.min(10, potentialStance)); }
+                else { console.warn(`OpenAI returned non-numeric stance: ${aiResult.stance}. Using default.`); }
+            } else { console.warn("OpenAI response did not contain a numeric 'stance'. Using default."); }
 
+            // Extract reasoning
             if (typeof aiResult.reasoning === 'string' && aiResult.reasoning.trim().length > 0) {
                 stanceReasoning = aiResult.reasoning.trim();
             } else {
@@ -72,42 +67,65 @@ export async function POST(request: Request) {
                 stanceReasoning = `AI analysis resulted in stance ${initialStance.toFixed(1)}/10, but no specific reasoning was provided.`;
             }
 
-        } catch (aiError) {
+            // Extract scaleDefinitions
+            if (aiResult.scaleDefinitions && typeof aiResult.scaleDefinitions === 'object' && Object.keys(aiResult.scaleDefinitions).length > 0) {
+                const keys = Object.keys(aiResult.scaleDefinitions);
+                const looksValid = keys.length >= 10 && keys.every(k => !isNaN(parseInt(k)) && parseInt(k) >= 0 && parseInt(k) <= 10);
+                if (looksValid) {
+                    scaleDefs = aiResult.scaleDefinitions as Prisma.JsonValue;
+                    console.log("Storing scale definitions received from OpenAI.");
+                } else {
+                    console.warn("Received 'scaleDefinitions' but structure seems invalid. Not storing.");
+                    scaleDefs = null;
+                }
+            } else {
+                console.log("OpenAI response did not include valid 'scaleDefinitions'. Not storing.");
+                scaleDefs = null;
+            }
+
+        } catch (aiError: unknown) {
             console.error("Error calling OpenAI for initial stance:", aiError);
-            // Proceed with default stance if AI call fails
-            stanceReasoning = `AI analysis failed. Default neutral stance assigned. Error: ${aiError instanceof Error ? aiError.message : 'Unknown AI error'}`;
+            const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown AI error';
+            stanceReasoning = `AI analysis failed. Default neutral stance assigned. Error: ${errorMessage}`;
+            scaleDefs = null;
         }
         // --- End OpenAI Call ---
 
-
-        // Create topic in database using the determined stance
+        // Create topic in database - this requires prisma generate to have been run
         const newTopic = await prisma.topic.create({
             data: {
                 name: topicName,
                 description: topicDescription,
                 category: category || null,
-                currentStance: initialStance, // Use stance from AI (or default)
-                stanceReasoning: stanceReasoning, // Use reasoning from AI (or default/error)
+                currentStance: initialStance,
+                stanceReasoning: stanceReasoning,
+                scaleDefinitions: scaleDefs // Save the extracted definitions
             },
         });
 
         return NextResponse.json(newTopic, { status: 201 });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Topic creation error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    } finally {
-        // await prisma.$disconnect(); // Manage client lifecycle
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return NextResponse.json({ error: 'A topic with this name already exists.' }, { status: 409 });
+        }
+        const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
 
-// --- GET function (remains the same) ---
+// --- GET function (List topics) ---
 export async function GET() {
     try {
-        const topics = await prisma.topic.findMany({ where: { isActive: true }, orderBy: { createdAt: 'desc' }, });
+        const topics = await prisma.topic.findMany({
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+        });
         return NextResponse.json(topics);
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error fetching topics:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }

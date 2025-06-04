@@ -1,0 +1,138 @@
+// src/lib/ollamaService.ts - Fixed for robust non-JSON responses
+// Service for connecting to Ollama LLM
+
+// Types for Ollama responses
+export interface OllamaResponse {
+    model: string;
+    created_at: string;
+    response: string;
+    done: boolean;
+    context?: number[];
+    total_duration?: number;
+    load_duration?: number;
+    prompt_eval_count?: number;
+    prompt_eval_duration?: number;
+    eval_count?: number;
+    eval_duration?: number;
+}
+
+export interface OllamaRequestOptions {
+    model: string;
+    prompt: string;
+    context?: number[];
+    system?: string;
+    template?: string;
+    options?: {
+        temperature?: number;
+        top_p?: number;
+        top_k?: number;
+        num_predict?: number;
+        stop?: string[];
+        frequency_penalty?: number;
+        presence_penalty?: number;
+        mirostat?: number;
+        mirostat_tau?: number;
+        mirostat_eta?: number;
+        num_ctx?: number;
+        repeat_penalty?: number;
+        num_gpu?: number;
+        num_thread?: number;
+        seed?: number;
+    };
+    stream?: boolean;
+}
+
+// Default Ollama endpoint (can be configured in environment variables)
+const OLLAMA_API_BASE = process.env.NEXT_PUBLIC_OLLAMA_API_BASE || 'http://localhost:11434';
+
+/**
+ * Most simple direct generation - get raw text from Ollama
+ * @param model Model name
+ * @param prompt User prompt
+ * @param systemPrompt Optional system prompt
+ * @returns Raw text response
+ */
+export async function getOllamaRawResponse(
+    model: string,
+    prompt: string,
+    systemPrompt?: string
+): Promise<string> {
+    const endpoint = `${OLLAMA_API_BASE}/api/generate`;
+
+    try {
+        console.log(`Calling Ollama model ${model} for raw text...`);
+
+        const requestBody: any = {
+            model: model,
+            prompt: prompt,
+            stream: false,
+            options: {
+                temperature: 0.7,
+            }
+        };
+
+        if (systemPrompt) {
+            requestBody.system = systemPrompt;
+        }
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Ollama API error: ${response.status} - ${errorText}`);
+        }
+
+        // Get the response as text first
+        const responseText = await response.text();
+
+        try {
+            // Try to parse as JSON (Ollama API returns JSON)
+            const data = JSON.parse(responseText);
+            return data.response || responseText;
+        } catch (parseError) {
+            console.warn('Failed to parse Ollama response as JSON:', parseError);
+            // Return the raw text
+            return responseText;
+        }
+    } catch (error) {
+        console.error('Ollama raw generation failed:', error);
+        throw error;
+    }
+}
+
+/**
+ * List available models from Ollama
+ * @returns Promise with array of available model names
+ */
+export async function listOllamaModels(): Promise<string[]> {
+    const endpoint = `${OLLAMA_API_BASE}/api/tags`;
+
+    try {
+        const response = await fetch(endpoint);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Ollama API error: ${response.status} - ${errorText}`);
+        }
+
+        const responseText = await response.text();
+
+        try {
+            const data = JSON.parse(responseText);
+            // Extract model names from response
+            return data.models?.map((model: any) => model.name) || [];
+        } catch (parseError) {
+            console.error('Failed to parse Ollama models response as JSON:', parseError);
+            return [];
+        }
+    } catch (error) {
+        console.error('Failed to list Ollama models:', error);
+        return [];
+    }
+}

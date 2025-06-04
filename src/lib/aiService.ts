@@ -1,12 +1,13 @@
-// src/lib/aiService.ts
+// src/lib/aiService.ts - Simplified approach for Ollama
 import OpenAI from 'openai';
 import { Argument, PrismaClient } from '@prisma/client';
+import { getOllamaRawResponse } from './ollamaService';
 
 const prisma = new PrismaClient();
 
 const openai = new OpenAI(); // Reads OPENAI_API_KEY from env
-const openaiModel = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
-const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || openaiModel;
+const defaultOpenAIModel = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
+const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || defaultOpenAIModel;
 
 // --- Types for getAiDebateResponse ---
 export interface AiResponseInput {
@@ -16,6 +17,9 @@ export interface AiResponseInput {
     previousArguments: Argument[];
     currentArgumentText: string;
     retrievedContext: string;
+    // Add LLM selection parameters
+    llmProvider?: 'openai' | 'ollama';
+    llmModel?: string;
 }
 
 export interface AiResponseOutput {
@@ -23,17 +27,28 @@ export interface AiResponseOutput {
     newStance: number;
     stanceShift: number;
     shiftReasoning: string;
+    model?: string; // Track which model generated the response
 }
 
-// --- Function to get AI Debate Response ---
+// --- Function to get AI Debate Response (supports both OpenAI and Ollama) ---
 export async function getAiDebateResponse(input: AiResponseInput): Promise<AiResponseOutput> {
-    const { debateTopicName, stanceBefore, debateGoalDirection, previousArguments, currentArgumentText, retrievedContext } = input;
+    const {
+        debateTopicName,
+        stanceBefore,
+        debateGoalDirection,
+        previousArguments,
+        currentArgumentText,
+        retrievedContext,
+        llmProvider = 'openai', // Default to OpenAI if not specified
+        llmModel = defaultOpenAIModel // Default model if not specified
+    } = input;
 
     // Default values in case of error
     let aiResponseText: string = "[AI response generation failed]";
     let newStance: number = stanceBefore;
     let stanceShift: number = 0;
     let shiftReasoning: string = "AI Error: Could not process response.";
+    let usedModel: string = llmProvider === 'openai' ? llmModel : llmModel;
 
     try {
         // Format previous arguments for context
@@ -58,53 +73,109 @@ INSTRUCTIONS:
 1. Consider the user's new argument and how compelling it is.
 2. Decide if and how much to shift your stance based on the merits of their argument.
 3. Respond with thoughtful, nuanced reasoning.
-4. You must return ONLY valid JSON with these fields:
-   - "aiResponse": your debate response text
-   - "newStance": your new stance as a number between 0-10
-   - "reasoning": explanation for why you shifted (or didn't shift) your stance
+
+At the end of your response, include these two lines (and ONLY these two lines) in this EXACT format:
+NEW_STANCE: [number between 0-10]
+REASONING: [brief explanation for your stance shift or lack thereof]
+
+Example format:
+<Your debate response text here...>
+
+NEW_STANCE: 7.5
+REASONING: The argument was somewhat persuasive but didn't fully address key concerns.
 
 Be fair but not too easy to persuade. Require good arguments to shift your position.`;
 
-        console.log(`Calling OpenAI model ${openaiModel}...`);
-        const completion = await openai.chat.completions.create({
-            model: openaiModel,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: currentArgumentText }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.7
-        });
+        if (llmProvider === 'openai') {
+            console.log(`Calling OpenAI model ${llmModel}...`);
+            const completion = await openai.chat.completions.create({
+                model: llmModel,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: currentArgumentText }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.7
+            });
 
-        // Parse and validate AI response
-        const content = completion.choices[0]?.message?.content || '{}';
-        const aiResult = JSON.parse(content);
+            // Parse OpenAI response
+            const content = completion.choices[0]?.message?.content || '{}';
+            const aiResult = JSON.parse(content);
+            usedModel = llmModel; // Track the model used
 
-        // Get AI response text
-        aiResponseText = aiResult.aiResponse || "[AI failed to generate a response]";
+            // Get AI response text
+            aiResponseText = aiResult.aiResponse || "[AI failed to generate a response]";
 
-        // Get and validate new stance
-        const potentialStance = parseFloat(aiResult.newStance);
-        if (!isNaN(potentialStance)) {
-            newStance = Math.max(0, Math.min(10, potentialStance));
+            // Get and validate new stance
+            const potentialStance = parseFloat(aiResult.newStance);
+            if (!isNaN(potentialStance)) {
+                newStance = Math.max(0, Math.min(10, potentialStance));
+            }
+
+            // Get reasoning for the shift
+            shiftReasoning = aiResult.reasoning || "[No reasoning provided]";
+
+        } else if (llmProvider === 'ollama') {
+            console.log(`Calling Ollama model ${llmModel} with simplified approach...`);
+
+            // Use the simpler approach for Ollama - get raw text
+            const response = await getOllamaRawResponse(
+                llmModel,
+                currentArgumentText,
+                systemPrompt
+            );
+
+            usedModel = llmModel;
+
+            // Extract the stance and reasoning
+            const stanceMatch = response.match(/NEW_STANCE:\s*(\d+(\.\d+)?)/);
+            const reasoningMatch = response.match(/REASONING:\s*(.+?)(\n|$)/);
+
+            // Extract stance if found
+            if (stanceMatch && stanceMatch[1]) {
+                const extractedStance = parseFloat(stanceMatch[1]);
+                if (!isNaN(extractedStance)) {
+                    newStance = Math.max(0, Math.min(10, extractedStance));
+                }
+            }
+
+            // Extract reasoning if found
+            if (reasoningMatch && reasoningMatch[1]) {
+                shiftReasoning = reasoningMatch[1].trim();
+            }
+
+            // Remove the stance and reasoning lines from the response text
+            let cleanedResponse = response;
+            if (stanceMatch) {
+                cleanedResponse = cleanedResponse.replace(/NEW_STANCE:\s*(\d+(\.\d+)?)(\n|$)/, '');
+            }
+            if (reasoningMatch) {
+                cleanedResponse = cleanedResponse.replace(/REASONING:\s*(.+?)(\n|$)/, '');
+            }
+
+            // Trim any extra whitespace
+            aiResponseText = cleanedResponse.trim();
+
+            // Fallback if response is empty
+            if (!aiResponseText) {
+                aiResponseText = response;
+            }
         }
 
         // Calculate stance shift
         stanceShift = newStance - stanceBefore;
 
-        // Get reasoning for the shift
-        shiftReasoning = aiResult.reasoning || "[No reasoning provided]";
-
-        console.log(`OpenAI response: Stance changed from ${stanceBefore} to ${newStance}. Shift: ${stanceShift.toFixed(2)}`);
+        console.log(`${llmProvider} response: Stance changed from ${stanceBefore} to ${newStance}. Shift: ${stanceShift.toFixed(2)}`);
 
     } catch (aiError: unknown) {
-        console.error("OpenAI call failed in aiService:", aiError);
+        console.error(`${llmProvider} call failed in aiService:`, aiError);
         shiftReasoning = `AI Error: ${aiError instanceof Error ? aiError.message : 'Unknown AI error'}`;
     }
 
-    return { aiResponseText, newStance, stanceShift, shiftReasoning };
+    return { aiResponseText, newStance, stanceShift, shiftReasoning, model: usedModel };
 }
 
+// Other functions remain unchanged
 // Define interface for user data when included with arguments
 interface ArgumentWithUser extends Argument {
     user?: {

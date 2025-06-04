@@ -1,179 +1,213 @@
-// prisma/schema.prisma
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "sqlite" // Or your chosen database provider (postgresql, mysql, etc.)
   url      = env("DATABASE_URL")
 }
 
+// --- Models ---
+
 model User {
-  userId          Int       @id @default(autoincrement())
-  username        String    @unique
-  email           String    @unique
+  userId          Int      @id @default(autoincrement())
+  createdAt       DateTime @default(now())
+  username        String   @unique
+  email           String   @unique
   passwordHash    String
   displayName     String?
   bio             String?
   profileImageUrl String?
-  totalPoints     Int       @default(0)
-  rank            Int?
-  createdAt       DateTime  @default(now())
-  lastLogin       DateTime?
-  isActive        Boolean   @default(true)
-  isVerified      Boolean   @default(false)
-  isAdmin         Boolean   @default(false)
+  totalPoints     Int      @default(0)
+  rank            String?
+  isAdmin         Boolean  @default(false)
+  isActive        Boolean  @default(true)
 
-  // Relations
-  authProviders AuthProvider[]
-  debates       Debate[]
-  arguments     Argument[]
-  comments      Comment[]
-  achievements  UserAchievement[]
-  notifications Notification[]
-  sessions      Session[]
+  debates         Debate[]
+  arguments       Argument[]
+  comments        Comment[]
+  notifications   Notification[] @relation("UserNotification") // Relation for notifications FOR this user
 
-  // --- Added Following/Followers Relations ---
-  following     UserFollows[] @relation("UserFollowing") // Users this user is following
-  followers     UserFollows[] @relation("UserFollowers") // Users following this user
-  // -----------------------------------------
+  // Follows relationships
+  followers       UserFollows[] @relation("Followed")
+  following       UserFollows[] @relation("Follower")
+
+  // *** ADDED: Opposite relation for notifications related TO this user ***
+  relatedNotifications Notification[] @relation("RelatedUserNotifications")
+
+  // Session/Account models for NextAuth if needed
+  // accounts        Account[]
+  // sessions        Session[]
 
   @@map("users")
 }
 
-// --- New UserFollows Model ---
 model UserFollows {
   followId    Int      @id @default(autoincrement())
-  followerId  Int      // ID of the user doing the following
-  followedId  Int      // ID of the user being followed
+  followerId  Int
+  followedId  Int
   createdAt   DateTime @default(now())
 
-  // Relations to User model
-  follower    User     @relation("UserFollowing", fields: [followerId], references: [userId], onDelete: Cascade)
-  followed    User     @relation("UserFollowers", fields: [followedId], references: [userId], onDelete: Cascade)
+  follower    User     @relation("Follower", fields: [followerId], references: [userId], onDelete: Cascade)
+  followed    User     @relation("Followed", fields: [followedId], references: [userId], onDelete: Cascade)
 
-  @@unique([followerId, followedId]) // Ensure a user can only follow another user once
+  @@unique([followerId, followedId])
   @@map("user_follows")
 }
-// ---------------------------
 
-model AuthProvider {
-  providerId     Int      @id @default(autoincrement())
-  userId         Int
-  providerName   String
-  providerUserId String
-  createdAt      DateTime @default(now())
-  user           User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  @@unique([providerName, providerUserId])
-  @@map("auth_providers")
-}
 
 model Topic {
   topicId         Int      @id @default(autoincrement())
-  name            String
-  description     String?
-  category        String?
-  isSponsored     Boolean  @default(false)
-  sponsorId       Int?
-  currentStance   Float
-  stanceReasoning String?
-  debateCount     Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  name            String   @unique
+  description     String?
+  category        String?
+  currentStance   Float
+  stanceReasoning String?
   isActive        Boolean  @default(true)
+
+  scaleDefinitions Json?    // Store the AI's 0-10 scale definition
+
   debates         Debate[]
+
   @@map("topics")
 }
 
 model Debate {
-  debateId      Int      @id @default(autoincrement())
-  topicId       Int
-  userId        Int
-  initialStance Float
-  finalStance   Float?
-  goalDirection String
-  pointsEarned  Float?
-  turnCount     Int      @default(0)
-  maxTurns      Int      @default(7)
-  status        String   @default("active")
-  summaryArticle String?   @map("summary_article")
-  createdAt     DateTime @default(now())
-  completedAt   DateTime?
-  isPublic      Boolean  @default(true)
-  topic         Topic    @relation(fields: [topicId], references: [topicId])
-  user          User     @relation(fields: [userId], references: [userId])
-  arguments     Argument[]
-  comments      Comment[]
+  debateId        Int      @id @default(autoincrement())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userId          Int
+  topicId         Int
+  initialStance   Float
+  finalStance     Float?
+  goalDirection   String
+  status          String   @default("active")
+  turnCount       Int      @default(0)
+  maxTurns        Int      @default(5)
+  pointsEarned    Float?
+  summaryArticle  String?
+  completedAt     DateTime?
+
+  user            User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  topic           Topic    @relation(fields: [topicId], references: [topicId], onDelete: Cascade)
+
+  arguments       Argument[]
+  comments        Comment[]
+  notifications   Notification[] @relation("RelatedDebate")
+
+  @@index([userId])
+  @@index([topicId])
   @@map("debates")
 }
 
+
 model Argument {
-  argumentId    Int      @id @default(autoincrement())
-  debateId      Int
-  userId        Int
-  turnNumber    Int
-  argumentText  String   @map("argument_text")
-  aiResponse    String?
-  stanceBefore  Float
-  stanceAfter   Float?
-  stanceShift   Float?
-  shiftReasoning String?  @map("shift_reasoning")
-  createdAt     DateTime @default(now())
-  debate        Debate   @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
-  user          User     @relation(fields: [userId], references: [userId])
+  argumentId      Int       @id @default(autoincrement())
+  createdAt       DateTime  @default(now())
+  debateId        Int
+  userId          Int
+  turnNumber      Int
+  argumentText    String
+  aiResponse      String?
+  stanceBefore    Float
+  stanceAfter     Float?
+  stanceShift     Float?
+  shiftReasoning  String?
+
+  debate          Debate    @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([debateId])
   @@map("arguments")
 }
 
+
 model Comment {
-  commentId   Int      @id @default(autoincrement())
-  debateId    Int?
-  userId      Int
-  parentId    Int?     @map("parent_comment_id")
-  commentText String   @map("comment_text")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-  debate      Debate?  @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [userId])
-  parent      Comment? @relation("CommentReplies", fields: [parentId], references: [commentId], onDelete: Cascade, onUpdate: NoAction)
-  replies     Comment[] @relation("CommentReplies")
+  commentId       Int       @id @default(autoincrement())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  commentText     String
+  userId          Int
+  debateId        Int
+  parentId        Int?
+  isDeleted       Boolean   @default(false)
+
+  user            User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  debate          Debate    @relation(fields: [debateId], references: [debateId], onDelete: Cascade)
+
+  parent          Comment?  @relation("Replies", fields: [parentId], references: [commentId], onDelete: NoAction, onUpdate: NoAction)
+  replies         Comment[] @relation("Replies")
+
+  notifications   Notification[] @relation("RelatedComment")
+
+  @@index([userId])
+  @@index([debateId])
+  @@index([parentId])
   @@map("comments")
 }
 
-model UserAchievement {
-  userAchievementId Int      @id @default(autoincrement())
-  userId            Int
-  achievementId     Int
-  achievedAt        DateTime @default(now())
-  user              User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  // achievement Achievement @relation(...) // Add Achievement model later
-  @@unique([userId, achievementId])
-  @@map("user_achievements")
-}
-
 model Notification {
-  notificationId   Int      @id @default(autoincrement())
-  userId           Int
-  notificationType String
-  content          String? @map("content")
-  relatedUserId    Int?
-  relatedDebateId  Int?
-  relatedCommentId Int?
-  isRead           Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  user             User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  // Add relations for relatedUser, relatedDebate, relatedComment later
+  notificationId    Int       @id @default(autoincrement())
+  createdAt         DateTime  @default(now())
+  userId            Int       // User receiving the notification
+  notificationType  String
+  relatedUserId     Int?      // e.g., ID of the user who followed or commented
+  relatedDebateId   Int?
+  relatedCommentId  Int?
+  content           String
+  isRead            Boolean   @default(false)
+
+  // Corrected relation names
+  user              User      @relation("UserNotification", fields: [userId], references: [userId], onDelete: Cascade) // Relation for the recipient
+  relatedUser       User?     @relation("RelatedUserNotifications", fields: [relatedUserId], references: [userId], onDelete: SetNull) // Relation for the user *causing* the notification
+  relatedDebate     Debate?   @relation("RelatedDebate", fields: [relatedDebateId], references: [debateId], onDelete: Cascade)
+  relatedComment    Comment?  @relation("RelatedComment", fields: [relatedCommentId], references: [commentId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([relatedUserId])
+  @@index([relatedDebateId])
   @@map("notifications")
 }
 
-model Session {
-  sessionId String   @id @map("session_id")
-  userId    Int
-  ipAddress String?
-  userAgent String? @map("user_agent")
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  isActive  Boolean  @default(true)
-  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  @@map("sessions")
+// Example NextAuth Models (Uncomment and adjust if using PrismaAdapter)
+/*
+model Account {
+  id                 String  @id @default(cuid())
+  userId             Int
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+*/
