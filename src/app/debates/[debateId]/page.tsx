@@ -124,20 +124,10 @@ export default function DebatePage() {
             setError(errorMessage); console.error("Error fetching data:", err);
             setDebate(null); setComments([]); // Clear data on error
         } finally {
-<<<<<<< Updated upstream
             setLoading(false);
+            setLoadingComments(false);
         }
     }, [debateId]);
-
-    // Initial fetch
-    useEffect(() => {
-        if (debateIdStr) {
-            fetchDebateAndComments(true);
-        } else {
-            setError("Debate ID missing");
-            setLoading(false);
-        }
-    }, [debateIdStr, fetchDebateAndComments]);
 
     // Poll for updates while debate is active
     useEffect(() => {
@@ -145,7 +135,7 @@ export default function DebatePage() {
 
         const refreshInterval = setInterval(() => {
             // Only refresh debate data, not comments to reduce load
-            fetchDebateAndComments(false);
+            fetchDebateAndComments();
         }, 10000); // Check every 10 seconds
 
         return () => clearInterval(refreshInterval);
@@ -174,16 +164,15 @@ export default function DebatePage() {
             }
 
             // Refetch after successful submission
-            await fetchDebateAndComments(true);
+            await fetchDebateAndComments();
 
             // Reset form
             form.reset();
         } catch (err: unknown) {
             console.error("Submit argument error:", err);
             setError(err instanceof Error ? err.message : "Could not submit argument");
-=======
-            setLoading(false); setLoadingComments(false);
->>>>>>> Stashed changes
+            setLoading(false);
+            setLoadingComments(false);
         }
     };
 
