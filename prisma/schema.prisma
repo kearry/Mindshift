@@ -92,6 +92,8 @@ model Debate {
   pointsEarned    Float?
   summaryArticle  String?
   completedAt     DateTime?
+  llmProvider     String?
+  llmModel        String?
 
   user            User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   topic           Topic    @relation(fields: [topicId], references: [topicId], onDelete: Cascade)
