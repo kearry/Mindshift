@@ -4,7 +4,7 @@
 'use client';
 // ****** NO COMMENTS OR EMPTY LINES ABOVE ******
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, useCallback, FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import ReactMarkdown from 'react-markdown'; // Use correct import
@@ -89,7 +89,7 @@ export default function DebatePage() {
     const debateId = params?.debateId as string;
 
     // --- Data Fetching Function ---
-    const fetchDebateAndComments = async () => {
+    const fetchDebateAndComments = useCallback(async () => {
         if (!debateId) {
             setError("Debate ID is missing in the URL.");
             setLoading(false); setLoadingComments(false); return;
@@ -140,41 +140,6 @@ export default function DebatePage() {
 
         return () => clearInterval(refreshInterval);
     }, [debate?.status, fetchDebateAndComments]);
-
-    // Submit argument handler
-    const handleArgumentSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const form = e.currentTarget;
-        const formData = new FormData(form);
-        const argumentText = formData.get('argumentText') as string;
-
-        if (!argumentText?.trim() || isNaN(debateId)) return;
-
-        try {
-            const baseUrl = window.location.origin;
-            const response = await fetch(`${baseUrl}/api/debates/${debateId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ argumentText: argumentText.trim() }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to submit argument');
-            }
-
-            // Refetch after successful submission
-            await fetchDebateAndComments();
-
-            // Reset form
-            form.reset();
-        } catch (err: unknown) {
-            console.error("Submit argument error:", err);
-            setError(err instanceof Error ? err.message : "Could not submit argument");
-            setLoading(false);
-            setLoadingComments(false);
-        }
-    };
 
     // --- Data Fetching Effects ---
     useEffect(() => {
