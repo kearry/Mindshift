@@ -34,6 +34,8 @@ interface TransactionResult {
     previousArguments: Argument[];
     maxTurns: number;
     currentTurnCountAfterUser: number;
+    existingProvider: string | null;
+    existingModel: string | null;
 }
 
 // --- GET Handler (unchanged) ---
@@ -150,7 +152,9 @@ export async function POST(request: Request, context: RouteContext) {
                 debateTopicName: debate.topic.name,
                 previousArguments: debate.arguments,
                 maxTurns: debate.maxTurns,
-                currentTurnCountAfterUser: currentTurns + 1
+                currentTurnCountAfterUser: currentTurns + 1,
+                existingProvider: debate.llmProvider ?? null,
+                existingModel: debate.llmModel ?? null
             };
         });
 
@@ -163,8 +167,13 @@ export async function POST(request: Request, context: RouteContext) {
             debateTopicName,
             previousArguments,
             maxTurns,
-            currentTurnCountAfterUser
+            currentTurnCountAfterUser,
+            existingProvider,
+            existingModel
         } = transactionResult;
+
+        const providerToUse = (llmProvider as 'openai' | 'ollama' | undefined) ?? existingProvider ?? 'openai';
+        const modelToUse = llmModel ?? existingModel ?? process.env.OPENAI_MODEL_NAME ?? 'gpt-4o-mini';
 
         // --- Step 2: Get RAG Context (from separate API endpoint) ---
         let retrievedContext = "";
@@ -187,7 +196,7 @@ export async function POST(request: Request, context: RouteContext) {
         }
 
         // --- Step 3: Call AI Service with LLM selection ---
-        console.log(`Calling AI Service for response with provider: ${llmProvider || 'openai'}, model: ${llmModel || 'default'}`);
+        console.log(`Calling AI Service for response with provider: ${providerToUse}, model: ${modelToUse}`);
         const aiInput: AiResponseInput = {
             debateTopicName,
             stanceBefore,
@@ -195,9 +204,9 @@ export async function POST(request: Request, context: RouteContext) {
             previousArguments,
             currentArgumentText: argumentText.trim(),
             retrievedContext,
-            // Add LLM selection parameters if provided
-            llmProvider: llmProvider as 'openai' | 'ollama' | undefined,
-            llmModel: llmModel
+            // Pass final LLM selection
+            llmProvider: providerToUse,
+            llmModel: modelToUse
         };
 
         const aiResponse = await getAiDebateResponse(aiInput);
@@ -234,6 +243,8 @@ export async function POST(request: Request, context: RouteContext) {
                     turnCount: { increment: 1 },
                     pointsEarned: { increment: pointsThisTurn },
                     status: finalDebateStatus,
+                    ...(existingProvider ? {} : { llmProvider: providerToUse }),
+                    ...(existingModel ? {} : { llmModel: modelToUse }),
                     ...(debateEnded && {
                         finalStance: newStance,
                         completedAt: new Date()
