@@ -100,35 +100,27 @@ export default function DebatePage() {
         }
     }, [debateId]);
 
-    // Initial fetch with polling for active debates
+    // Initial fetch
     useEffect(() => {
         if (debateIdStr) {
-            // Initial fetch
             fetchDebateAndComments(true);
-
-            // Set up polling for active debates
-            let refreshInterval: NodeJS.Timeout | null = null;
-
-            // Only set up polling if debate is active, but don't add debate to dependencies
-            // This avoids the infinite fetch loop
-            if (debate?.status === 'active') {
-                refreshInterval = setInterval(() => {
-                    // Only refresh debate data, not comments to reduce load
-                    fetchDebateAndComments(false);
-                }, 10000); // Check every 10 seconds
-            }
-
-            // Clean up interval on unmount
-            return () => {
-                if (refreshInterval) {
-                    clearInterval(refreshInterval);
-                }
-            };
         } else {
             setError("Debate ID missing");
             setLoading(false);
         }
-    }, [debateIdStr, fetchDebateAndComments]); // IMPORTANT: debate is NOT a dependency
+    }, [debateIdStr, fetchDebateAndComments]);
+
+    // Poll for updates while debate is active
+    useEffect(() => {
+        if (debate?.status !== 'active') return;
+
+        const refreshInterval = setInterval(() => {
+            // Only refresh debate data, not comments to reduce load
+            fetchDebateAndComments(false);
+        }, 10000); // Check every 10 seconds
+
+        return () => clearInterval(refreshInterval);
+    }, [debate?.status, fetchDebateAndComments]);
 
     // Submit argument handler
     const handleArgumentSubmit = async (e: FormEvent<HTMLFormElement>) => {
