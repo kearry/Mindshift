@@ -132,10 +132,10 @@ export default function Header() {
                                         Accept
                                     </button>
                                 </div>
+
                             </div>
                         )}
                     </div>
-
                     {/* Theme Toggle - only show icon after component is mounted */}
                     <button
                         onClick={toggleTheme}

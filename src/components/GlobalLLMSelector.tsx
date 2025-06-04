@@ -2,6 +2,7 @@
 
 import LLMSelector from "./LLMSelector";
 import { useLLMSettings } from "./LLMSettingsContext";
+
 export default function GlobalLLMSelector() {
   const { provider, model, setProvider, setModel } = useLLMSettings();
 
