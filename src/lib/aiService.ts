@@ -1,7 +1,7 @@
 // src/lib/aiService.ts - Simplified approach for Ollama
 import OpenAI from 'openai';
 import { Argument, PrismaClient } from '@prisma/client';
-import { getOllamaRawResponse } from './ollamaService';
+import { getOllamaRawResponse, extractJsonObject } from './ollamaService';
 import { getInitialStanceSystemPrompt, getInitialStanceUserMessage } from './prompts/initialStancePrompt';
 
 const prisma = new PrismaClient();
@@ -80,24 +80,33 @@ export async function getAiInitialStance(
                 systemPrompt
             );
             usedModel = `ollama:${llmModel}`;
+            const jsonString = extractJsonObject(response);
+            if (!jsonString) {
+                console.error('Failed to extract JSON from Ollama response:', response);
+                throw new Error('Invalid Ollama response format');
+            }
+            let aiResult: any;
             try {
-                const aiResult = JSON.parse(response);
-                if (typeof aiResult.stance === 'number') {
-                    const s = parseFloat(aiResult.stance.toString());
-                    if (!isNaN(s)) stance = Math.max(0, Math.min(10, s));
-                }
-                if (typeof aiResult.reasoning === 'string' && aiResult.reasoning.trim().length > 0) {
-                    reasoning = aiResult.reasoning.trim();
-                }
-                if (aiResult.scaleDefinitions && typeof aiResult.scaleDefinitions === 'object') {
-                    scaleDefinitions = aiResult.scaleDefinitions as Record<string, string>;
-                }
+                aiResult = JSON.parse(jsonString);
             } catch (err) {
-                console.error('Failed to parse Ollama response for initial stance:', err);
+                console.error('Failed to parse Ollama JSON for initial stance:', err);
+                throw new Error('Ollama JSON parse error');
+            }
+
+            if (typeof aiResult.stance === 'number') {
+                const s = parseFloat(aiResult.stance.toString());
+                if (!isNaN(s)) stance = Math.max(0, Math.min(10, s));
+            }
+            if (typeof aiResult.reasoning === 'string' && aiResult.reasoning.trim().length > 0) {
+                reasoning = aiResult.reasoning.trim();
+            }
+            if (aiResult.scaleDefinitions && typeof aiResult.scaleDefinitions === 'object') {
+                scaleDefinitions = aiResult.scaleDefinitions as Record<string, string>;
             }
         }
     } catch (error) {
         console.error('Error getting initial stance:', error);
+        throw error;
     }
 
     return { stance, reasoning, scaleDefinitions, model: usedModel };
