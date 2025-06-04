@@ -118,10 +118,24 @@ export default function Header() {
                         {showLLMSettings && (
                             <div className="absolute right-0 mt-2 z-20 bg-white dark:bg-gray-700 p-2 border rounded shadow">
                                 <GlobalLLMSelector />
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <button
+                                        onClick={() => setShowLLMSettings(false)}
+                                        className="px-2 py-1 text-sm rounded bg-gray-200 dark:bg-gray-600"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => setShowLLMSettings(false)}
+                                        className="px-2 py-1 text-sm rounded bg-blue-500 text-white"
+                                    >
+                                        Accept
+                                    </button>
+                                </div>
+
                             </div>
                         )}
                     </div>
-
                     {/* Theme Toggle - only show icon after component is mounted */}
                     <button
                         onClick={toggleTheme}

@@ -13,7 +13,6 @@ import Link from 'next/link';
 import LLMSelector from '@/components/LLMSelector';
 import { useLLMSettings } from '@/components/LLMSettingsContext';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
-
 // --- Define expected data structure (Helper Types) ---
 type UserSnippet = {
     userId: number;
