@@ -42,6 +42,11 @@ export interface OllamaRequestOptions {
     stream?: boolean;
 }
 
+// Response format for listOllamaModels
+interface OllamaModelTag {
+    name: string;
+}
+
 // Default Ollama endpoint (can be configured in environment variables)
 const OLLAMA_API_BASE = process.env.NEXT_PUBLIC_OLLAMA_API_BASE || 'http://localhost:11434';
 
@@ -62,7 +67,7 @@ export async function getOllamaRawResponse(
     try {
         console.log(`Calling Ollama model ${model} for raw text...`);
 
-        const requestBody: any = {
+        const requestBody: OllamaRequestOptions = {
             model: model,
             prompt: prompt,
             stream: false,
@@ -124,9 +129,9 @@ export async function listOllamaModels(): Promise<string[]> {
         const responseText = await response.text();
 
         try {
-            const data = JSON.parse(responseText);
+            const data = JSON.parse(responseText) as { models?: OllamaModelTag[] };
             // Extract model names from response
-            return data.models?.map((model: any) => model.name) || [];
+            return data.models?.map((model: OllamaModelTag) => model.name) || [];
         } catch (parseError) {
             console.error('Failed to parse Ollama models response as JSON:', parseError);
             return [];

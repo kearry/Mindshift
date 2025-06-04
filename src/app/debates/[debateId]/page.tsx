@@ -13,7 +13,6 @@ import Link from 'next/link';
 import LLMSelector from '@/components/LLMSelector';
 import { useLLMSettings } from '@/components/LLMSettingsContext';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
-import type { Prisma } from '@prisma/client'; // Keep Prisma import if needed by other types
 
 // --- Define expected data structure (Helper Types) ---
 type UserSnippet = {
