@@ -26,6 +26,8 @@ Create a `.env` file based on the provided `.env.example`. Key variables include
 
 - `DEFAULT_LLM_PROVIDER` – initial provider for AI interactions (`openai` or `ollama`)
 - `DEFAULT_LLM_MODEL` – default model name used when no selection is made
+- `TOPIC_LLM_PROVIDER` – provider used when generating a topic's initial stance
+- `TOPIC_LLM_MODEL` – model name used for topic creation
 
 Other variables configure OpenAI credentials, Ollama connection and database paths. See `.env.example` for the full list.
 
