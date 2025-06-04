@@ -89,13 +89,16 @@ export default function DebatePage() {
     const debateId = params?.debateId as string;
 
     // --- Data Fetching Function ---
-    const fetchDebateAndComments = useCallback(async () => {
+    const fetchDebateAndComments = useCallback(async (showLoading: boolean = false) => {
         if (!debateId) {
             setError("Debate ID is missing in the URL.");
             setLoading(false); setLoadingComments(false); return;
         }
         // Reset states before fetching
-        setLoading(true); setLoadingComments(true);
+        if (showLoading) {
+            setLoading(true);
+        }
+        setLoadingComments(true);
         setError(null); setCommentError(null); setArgumentError(null);
 
         try {
@@ -135,7 +138,7 @@ export default function DebatePage() {
 
         const refreshInterval = setInterval(() => {
             // Only refresh debate data, not comments to reduce load
-            fetchDebateAndComments();
+            fetchDebateAndComments(false);
         }, 10000); // Check every 10 seconds
 
         return () => clearInterval(refreshInterval);
@@ -144,7 +147,7 @@ export default function DebatePage() {
     // --- Data Fetching Effects ---
     useEffect(() => {
         // Fetch data when the component mounts or debateId changes
-        fetchDebateAndComments();
+        fetchDebateAndComments(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [debateId]); // Dependency array ensures fetch runs on ID change
 
@@ -254,7 +257,7 @@ export default function DebatePage() {
             // On success, clear input and re-fetch all data to show updates
             console.log("Argument submitted, refreshing debate data...");
             setNewArgumentText('');
-            await fetchDebateAndComments(); // Re-fetch is simplest way to update UI
+            await fetchDebateAndComments(false); // Re-fetch is simplest way to update UI without scroll reset
         } catch (err: unknown) {
             // Handle fetch/network errors or errors thrown from response check
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while submitting argument.';
