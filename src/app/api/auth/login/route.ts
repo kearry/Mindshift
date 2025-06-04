@@ -1,7 +1,25 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
-// You'll likely need a library for session/token management later (e.g., jsonwebtoken or next-auth)
+import { createHmac } from 'crypto';
+
+function base64Url(input: Buffer) {
+    return input.toString('base64')
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+}
+
+function signJwt(payload: Record<string, unknown>, secret: string, expiresIn = 3600) {
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const body = { ...payload, exp: Math.floor(Date.now() / 1000) + expiresIn };
+    const headerEncoded = base64Url(Buffer.from(JSON.stringify(header)));
+    const payloadEncoded = base64Url(Buffer.from(JSON.stringify(body)));
+    const data = `${headerEncoded}.${payloadEncoded}`;
+    const signature = createHmac('sha256', secret).update(data).digest();
+    const signatureEncoded = base64Url(signature);
+    return `${data}.${signatureEncoded}`;
+}
 
 const prisma = new PrismaClient();
 
@@ -38,18 +56,14 @@ export async function POST(request: Request) {
         }
 
         // --- Session/Token Generation ---
-        // TODO: Implement session creation or JWT generation here
-        // This part is crucial for keeping the user logged in across requests.
-        // For now, we'll just return the user data (excluding password) on success.
-        // Example using JWT (requires 'jsonwebtoken' library):
-        // const token = jwt.sign({ userId: user.userId, username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        // return NextResponse.json({ token });
+        const token = signJwt({ userId: user.userId, username: user.username }, process.env.JWT_SECRET ?? 'changeme');
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { passwordHash: _, ...userWithoutPassword } = user;
 
-        // Placeholder success response - replace with session/token logic
-        return NextResponse.json({ message: 'Login successful', user: userWithoutPassword });
+        const response = NextResponse.json({ message: 'Login successful', token, user: userWithoutPassword });
+        response.cookies.set('token', token, { httpOnly: true, path: '/' });
+        return response;
 
     } catch (error) {
         console.error('Login error:', error);
