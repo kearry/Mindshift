@@ -26,12 +26,18 @@ export async function POST(request: Request) {
 
         // --- Determine AI stance via selected LLM ---
         const { llmProvider, llmModel } = body;
-        const aiResult = await getAiInitialStance({
-            topicName,
-            topicDescription,
-            llmProvider,
-            llmModel
-        });
+        let aiResult;
+        try {
+            aiResult = await getAiInitialStance({
+                topicName,
+                topicDescription,
+                llmProvider,
+                llmModel
+            });
+        } catch (err) {
+            console.error('Failed to determine AI initial stance:', err);
+            return NextResponse.json({ error: 'Failed to determine initial stance' }, { status: 500 });
+        }
 
         const initialStance = aiResult.stance;
         const stanceReasoning = aiResult.reasoning;

@@ -50,6 +50,32 @@ export interface OllamaModelTag {
 const OLLAMA_API_BASE = process.env.NEXT_PUBLIC_OLLAMA_API_BASE || 'http://localhost:11434';
 
 /**
+ * Extract the first JSON object contained in the given text.
+ * Useful for Ollama responses that may contain markup like "<think>" before
+ * the actual JSON payload.
+ *
+ * @param text Raw text that may contain a JSON object
+ * @returns The JSON object string if found, otherwise null
+ */
+export function extractJsonObject(text: string): string | null {
+    const start = text.indexOf('{');
+    if (start === -1) return null;
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+        const char = text[i];
+        if (char === '{') {
+            depth++;
+        } else if (char === '}') {
+            depth--;
+            if (depth === 0) {
+                return text.slice(start, i + 1);
+            }
+        }
+    }
+    return null;
+}
+
+/**
  * Most simple direct generation - get raw text from Ollama
  * @param model Model name
  * @param prompt User prompt
