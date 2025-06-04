@@ -42,7 +42,7 @@ export interface OllamaRequestOptions {
     stream?: boolean;
 }
 
-// Response format for listOllamaModels
+        const requestBody: OllamaRequestOptions = {
 interface OllamaModelTag {
     name: string;
 }
@@ -101,7 +101,7 @@ export async function getOllamaRawResponse(
             const data = JSON.parse(responseText);
             return data.response || responseText;
         } catch (parseError) {
-            console.warn('Failed to parse Ollama response as JSON:', parseError);
+            return data.models?.map((model: { name: string }) => model.name) || [];
             // Return the raw text
             return responseText;
         }

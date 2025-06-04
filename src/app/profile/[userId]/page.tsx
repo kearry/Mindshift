@@ -60,7 +60,7 @@ export default function UserProfilePage() {
             setLoading(false);
         }
         // Add userId to dependency array
-    }, [userId, userIdStr]); // Include userId dependency
+    }, [userId]);
 
 
     // Initial fetch
