@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown'; // Use correct import
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import LLMSelector from '@/components/LLMSelector';
+import { useLLMSettings } from '@/components/LLMSettingsContext';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
 import type { Prisma } from '@prisma/client'; // Keep Prisma import if needed by other types
 
@@ -83,8 +84,9 @@ export default function DebatePage() {
     const [newArgumentText, setNewArgumentText] = useState('');
     const [isSubmittingArgument, setIsSubmittingArgument] = useState(false);
     const [argumentError, setArgumentError] = useState<string | null>(null);
-    const [selectedProvider, setSelectedProvider] = useState<'openai' | 'ollama'>('openai');
-    const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
+    const { provider, model } = useLLMSettings();
+    const [selectedProvider, setSelectedProvider] = useState<'openai' | 'ollama'>(provider);
+    const [selectedModel, setSelectedModel] = useState<string>(model);
 
     const handleModelSelect = (provider: 'openai' | 'ollama', model: string) => {
         setSelectedProvider(provider);

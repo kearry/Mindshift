@@ -5,6 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import type { Notification } from '@prisma/client';
+import GlobalLLMSelector from './GlobalLLMSelector';
 
 // Define expected fields from notification
 type NotificationData = Pick<Notification, 'notificationId' | 'content' | 'createdAt' | 'isRead' | 'notificationType' | 'relatedDebateId' | 'relatedUserId' | 'relatedCommentId'>;
@@ -17,6 +18,7 @@ export default function Header() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const [markingRead, setMarkingRead] = useState(false);
+    const [showLLMSettings, setShowLLMSettings] = useState(false);
 
     // Theme handling
     const { theme, setTheme } = useTheme();
@@ -55,6 +57,10 @@ export default function Header() {
 
     const handleToggleNotifications = () => {
         setShowNotifications(prev => !prev);
+    };
+
+    const handleToggleLLMSettings = () => {
+        setShowLLMSettings(prev => !prev);
     };
 
     const handleMarkAllRead = async () => {
@@ -100,6 +106,21 @@ export default function Header() {
 
                 <div className="flex items-center space-x-4">
                     <Link href="/leaderboard" className="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">Leaderboard</Link>
+
+                    {/* Global LLM Settings */}
+                    <div className="relative">
+                        <button
+                            onClick={handleToggleLLMSettings}
+                            className="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+                        >
+                            AI Settings
+                        </button>
+                        {showLLMSettings && (
+                            <div className="absolute right-0 mt-2 z-20 bg-white dark:bg-gray-700 p-2 border rounded shadow">
+                                <GlobalLLMSelector />
+                            </div>
+                        )}
+                    </div>
 
                     {/* Theme Toggle - only show icon after component is mounted */}
                     <button
