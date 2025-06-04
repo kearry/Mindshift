@@ -2,6 +2,7 @@
 import OpenAI from 'openai';
 import { Argument, PrismaClient } from '@prisma/client';
 import { getOllamaRawResponse } from './ollamaService';
+import { getInitialStanceSystemPrompt, getInitialStanceUserMessage } from './prompts/initialStancePrompt';
 
 const prisma = new PrismaClient();
 
@@ -11,6 +12,101 @@ const defaultLLMProvider = process.env.DEFAULT_LLM_PROVIDER === 'ollama' ? 'olla
 const defaultOpenAIModel = process.env.OPENAI_MODEL_NAME || 'gpt-4o-mini';
 const defaultLLMModel = process.env.DEFAULT_LLM_MODEL || defaultOpenAIModel;
 const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || defaultOpenAIModel;
+
+// Defaults specifically for topic creation
+const topicLLMProvider = process.env.TOPIC_LLM_PROVIDER === 'ollama'
+    ? 'ollama'
+    : defaultLLMProvider;
+const topicLLMModel = process.env.TOPIC_LLM_MODEL || defaultLLMModel;
+
+// --- Types for getAiInitialStance ---
+export interface InitialStanceInput {
+    topicName: string;
+    topicDescription?: string | null;
+    llmProvider?: 'openai' | 'ollama';
+    llmModel?: string;
+}
+
+export interface InitialStanceOutput {
+    stance: number;
+    reasoning: string;
+    scaleDefinitions: Record<string, string> | null;
+    model: string;
+}
+
+// --- Function to determine initial stance for a new topic ---
+export async function getAiInitialStance(
+    input: InitialStanceInput
+): Promise<InitialStanceOutput> {
+    const {
+        topicName,
+        topicDescription,
+        llmProvider = topicLLMProvider,
+        llmModel = topicLLMModel
+    } = input;
+
+    let stance = 5.0;
+    let reasoning = "Default neutral stance assigned.";
+    let scaleDefinitions: Record<string, string> | null = null;
+    let usedModel = `${llmProvider}:${llmModel}`;
+
+    try {
+        const systemPrompt = getInitialStanceSystemPrompt();
+        const userMessage = getInitialStanceUserMessage(topicName, topicDescription);
+
+        if (llmProvider === 'openai') {
+            console.log(`Calling OpenAI model ${llmModel} for initial stance...`);
+            const completion = await openai.chat.completions.create({
+                model: llmModel,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userMessage }
+                ],
+                response_format: { type: 'json_object' }
+            });
+            const content = completion.choices[0]?.message?.content || '{}';
+            const aiResult = JSON.parse(content);
+            usedModel = `openai:${llmModel}`;
+            if (typeof aiResult.stance === 'number') {
+                const s = parseFloat(aiResult.stance.toString());
+                if (!isNaN(s)) stance = Math.max(0, Math.min(10, s));
+            }
+            if (typeof aiResult.reasoning === 'string' && aiResult.reasoning.trim().length > 0) {
+                reasoning = aiResult.reasoning.trim();
+            }
+            if (aiResult.scaleDefinitions && typeof aiResult.scaleDefinitions === 'object') {
+                scaleDefinitions = aiResult.scaleDefinitions as Record<string, string>;
+            }
+        } else if (llmProvider === 'ollama') {
+            console.log(`Calling Ollama model ${llmModel} for initial stance...`);
+            const response = await getOllamaRawResponse(
+                llmModel,
+                userMessage,
+                systemPrompt
+            );
+            usedModel = `ollama:${llmModel}`;
+            try {
+                const aiResult = JSON.parse(response);
+                if (typeof aiResult.stance === 'number') {
+                    const s = parseFloat(aiResult.stance.toString());
+                    if (!isNaN(s)) stance = Math.max(0, Math.min(10, s));
+                }
+                if (typeof aiResult.reasoning === 'string' && aiResult.reasoning.trim().length > 0) {
+                    reasoning = aiResult.reasoning.trim();
+                }
+                if (aiResult.scaleDefinitions && typeof aiResult.scaleDefinitions === 'object') {
+                    scaleDefinitions = aiResult.scaleDefinitions as Record<string, string>;
+                }
+            } catch (err) {
+                console.error('Failed to parse Ollama response for initial stance:', err);
+            }
+        }
+    } catch (error) {
+        console.error('Error getting initial stance:', error);
+    }
+
+    return { stance, reasoning, scaleDefinitions, model: usedModel };
+}
 
 // --- Types for getAiDebateResponse ---
 export interface AiResponseInput {
