@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-// Removed useSession and useRouter as they weren't used in the final logic here
+import { useRouter } from 'next/navigation';
 // Auth check is done on the API side
 
 export default function CreateTopicForm() {
@@ -10,6 +10,7 @@ export default function CreateTopicForm() {
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState('');
     const [message, setMessage] = useState('');
+    const router = useRouter();
 
     // No need for client-side session check if API requires auth
     // const { status } = useSession();
@@ -30,11 +31,8 @@ export default function CreateTopicForm() {
             if (!response.ok) {
                 throw new Error(data.error || `HTTP error! status: ${response.status}`);
             }
-            setMessage('Topic created successfully!');
-            setName('');
-            setDescription('');
-            setCategory('');
-            // router.push('/topics'); // Removed as router wasn't used
+            setMessage('Topic created successfully! Redirecting...');
+            router.push(`/topics/${data.topicId}`);
         } catch (error: unknown) { // Use unknown
             console.error('Topic creation failed:', error);
             setMessage(`Topic creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
