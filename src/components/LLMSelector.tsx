@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import { listOllamaModels } from '@/lib/ollamaService';
 
+const envDefaultProvider: 'openai' | 'ollama' =
+    process.env.DEFAULT_LLM_PROVIDER === 'ollama' ? 'ollama' : 'openai';
+const envDefaultModel = process.env.DEFAULT_LLM_MODEL || 'gpt-4o-mini';
+
 interface LLMSelectorProps {
     onModelSelect: (provider: 'openai' | 'ollama', model: string) => void;
     defaultProvider?: 'openai' | 'ollama';
@@ -11,8 +15,8 @@ interface LLMSelectorProps {
 
 export default function LLMSelector({
     onModelSelect,
-    defaultProvider = 'openai',
-    defaultModel = 'gpt-4o-mini'
+    defaultProvider = envDefaultProvider,
+    defaultModel = envDefaultModel,
 }: LLMSelectorProps) {
     const [provider, setProvider] = useState<'openai' | 'ollama'>(defaultProvider);
     const [model, setModel] = useState<string>(defaultModel);

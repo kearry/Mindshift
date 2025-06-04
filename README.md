@@ -20,6 +20,15 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment Variables
+
+Create a `.env` file based on the provided `.env.example`. Key variables include:
+
+- `DEFAULT_LLM_PROVIDER` – initial provider for AI interactions (`openai` or `ollama`)
+- `DEFAULT_LLM_MODEL` – default model name used when no selection is made
+
+Other variables configure OpenAI credentials, Ollama connection and database paths. See `.env.example` for the full list.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -6,7 +6,10 @@ import { getOllamaRawResponse } from './ollamaService';
 const prisma = new PrismaClient();
 
 const openai = new OpenAI(); // Reads OPENAI_API_KEY from env
-const defaultOpenAIModel = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
+
+const defaultLLMProvider = process.env.DEFAULT_LLM_PROVIDER === 'ollama' ? 'ollama' : 'openai';
+const defaultOpenAIModel = process.env.OPENAI_MODEL_NAME || 'gpt-4o-mini';
+const defaultLLMModel = process.env.DEFAULT_LLM_MODEL || defaultOpenAIModel;
 const summaryModel = process.env.OPENAI_SUMMARY_MODEL_NAME || defaultOpenAIModel;
 
 // --- Types for getAiDebateResponse ---
@@ -39,8 +42,8 @@ export async function getAiDebateResponse(input: AiResponseInput): Promise<AiRes
         previousArguments,
         currentArgumentText,
         retrievedContext,
-        llmProvider = 'openai', // Default to OpenAI if not specified
-        llmModel = defaultOpenAIModel // Default model if not specified
+        llmProvider = defaultLLMProvider, // Default provider from env
+        llmModel = defaultLLMModel // Default model from env
     } = input;
 
     // Default values in case of error
