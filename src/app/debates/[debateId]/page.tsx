@@ -10,6 +10,7 @@ import { useSession } from 'next-auth/react';
 import ReactMarkdown from 'react-markdown'; // Use correct import
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
+import LLMSelector from '@/components/LLMSelector';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
 import type { Prisma } from '@prisma/client'; // Keep Prisma import if needed by other types
 
@@ -61,6 +62,8 @@ type DebateWithRelations = {
     completedAt?: string | null; // Dates as strings from JSON
     turnCount: number; // Current turn count
     maxTurns: number; // Max turns per side
+    llmProvider?: 'openai' | 'ollama' | null;
+    llmModel?: string | null;
 };
 // --- End of Helper Types ---
 
@@ -80,6 +83,13 @@ export default function DebatePage() {
     const [newArgumentText, setNewArgumentText] = useState('');
     const [isSubmittingArgument, setIsSubmittingArgument] = useState(false);
     const [argumentError, setArgumentError] = useState<string | null>(null);
+    const [selectedProvider, setSelectedProvider] = useState<'openai' | 'ollama'>('openai');
+    const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
+
+    const handleModelSelect = (provider: 'openai' | 'ollama', model: string) => {
+        setSelectedProvider(provider);
+        setSelectedModel(model);
+    };
 
 
     // --- Hooks ---
@@ -110,6 +120,8 @@ export default function DebatePage() {
             }
             const debateData: DebateWithRelations = await debateResponse.json();
             setDebate(debateData);
+            setSelectedProvider((debateData.llmProvider as 'openai' | 'ollama') ?? 'openai');
+            setSelectedModel(debateData.llmModel ?? 'gpt-4o-mini');
 
             // Fetch comments
             const commentsResponse = await fetch(`/api/debates/${debateId}/comments`);
@@ -247,7 +259,11 @@ export default function DebatePage() {
             const response = await fetch(`/api/debates/${debateId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ argumentText: newArgumentText.trim() }),
+                body: JSON.stringify({
+                    argumentText: newArgumentText.trim(),
+                    llmProvider: selectedProvider,
+                    llmModel: selectedModel
+                }),
             });
             if (!response.ok) {
                 // Handle API errors
@@ -396,6 +412,11 @@ export default function DebatePage() {
                     <h2 className="text-2xl font-semibold mb-4">Your Turn (Turn {Math.floor(debate.turnCount / 2) + 1})</h2>
                     {/* Argument Submission Form */}
                     <form onSubmit={handleArgumentSubmit}>
+                        <LLMSelector
+                            onModelSelect={handleModelSelect}
+                            defaultProvider={selectedProvider}
+                            defaultModel={selectedModel}
+                        />
                         <label htmlFor="argumentText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"> Enter your argument </label>
                         <textarea id="argumentText" rows={5}
                             className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"

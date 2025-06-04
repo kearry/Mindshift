@@ -30,7 +30,7 @@ export interface AiResponseOutput {
     newStance: number;
     stanceShift: number;
     shiftReasoning: string;
-    model?: string; // Track which model generated the response
+    model?: string; // Track which provider and model generated the response (e.g., "openai:gpt-4o-mini")
 }
 
 // --- Function to get AI Debate Response (supports both OpenAI and Ollama) ---
@@ -51,7 +51,8 @@ export async function getAiDebateResponse(input: AiResponseInput): Promise<AiRes
     let newStance: number = stanceBefore;
     let stanceShift: number = 0;
     let shiftReasoning: string = "AI Error: Could not process response.";
-    let usedModel: string = llmProvider === 'openai' ? llmModel : llmModel;
+    // Track which provider and model were actually used
+    let usedModel: string = `${llmProvider}:${llmModel}`;
 
     try {
         // Format previous arguments for context
@@ -104,7 +105,7 @@ Be fair but not too easy to persuade. Require good arguments to shift your posit
             // Parse OpenAI response
             const content = completion.choices[0]?.message?.content || '{}';
             const aiResult = JSON.parse(content);
-            usedModel = llmModel; // Track the model used
+            usedModel = `openai:${llmModel}`; // Track provider and model used
 
             // Get AI response text
             aiResponseText = aiResult.aiResponse || "[AI failed to generate a response]";
@@ -128,7 +129,7 @@ Be fair but not too easy to persuade. Require good arguments to shift your posit
                 systemPrompt
             );
 
-            usedModel = llmModel;
+            usedModel = `ollama:${llmModel}`;
 
             // Extract the stance and reasoning
             const stanceMatch = response.match(/NEW_STANCE:\s*(\d+(\.\d+)?)/);

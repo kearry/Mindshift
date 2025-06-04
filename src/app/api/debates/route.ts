@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const { topicId, goalDirection } = body;
+        const { topicId, goalDirection, llmProvider, llmModel } = body;
 
         const parsedTopicId = parseInt(topicId, 10);
 
@@ -44,6 +44,8 @@ export async function POST(request: Request) {
                 initialStance: topic.currentStance,
                 goalDirection: goalDirection,
                 status: 'active',
+                llmProvider: llmProvider ?? 'openai',
+                llmModel: llmModel ?? process.env.OPENAI_MODEL_NAME ?? 'gpt-4o-mini',
             },
         });
 
