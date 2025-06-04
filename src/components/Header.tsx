@@ -117,7 +117,7 @@ export default function Header() {
                         </button>
                         {showLLMSettings && (
                             <div className="absolute right-0 mt-2 z-20 bg-white dark:bg-gray-700 p-2 border rounded shadow">
-                                <GlobalLLMSelector onSelectDone={() => setShowLLMSettings(false)} />
+                                <GlobalLLMSelector />
                             </div>
                         )}
                     </div>
