@@ -1,6 +1,6 @@
 // src/app/api/topics/[topicId]/route.ts
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma, User as PrismaUser, Debate as PrismaDebate } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 

@@ -52,7 +52,7 @@ export default function LLMSelector({
     };
 
     fetchOllamaModels();
-  }, [provider]);
+  }, [provider, model]);
 
   // Trigger the callback when provider or model changes
   useEffect(() => {

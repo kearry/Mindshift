@@ -123,7 +123,7 @@ export default function TopicDetailPage() {
                 <h1 className="text-3xl md:text-4xl font-bold mb-2">{topic.name}</h1>
                 {topic.description && (<p className="text-lg text-gray-700 dark:text-gray-300 mb-3">{topic.description}</p>)}
                 {topic.category && (<p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Category: {topic.category}</p>)}
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1"> Current AI's Stance: {topic.currentStance.toFixed(1)}/10 (0=Support, 10=Oppose) </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1"> Current AI&apos;s Stance: {topic.currentStance.toFixed(1)}/10 (0=Support, 10=Oppose) </p>
                 {topic.stanceReasoning && (<p className="text-xs italic text-gray-600 dark:text-gray-400 mb-3"> AI Reasoning: {topic.stanceReasoning} </p>)}
                 <p className="text-xs text-gray-400 dark:text-gray-500"> Topic ID: {topic.topicId} | Created: {new Date(topic.createdAt).toLocaleDateString()} </p>
             </div>
@@ -148,7 +148,7 @@ export default function TopicDetailPage() {
                 {/* Only show buttons if logged in */}
                 {sessionStatus === 'authenticated' && topic ? (
                     <div>
-                        <p className="mb-4 text-gray-700 dark:text-gray-300"> Challenge the AI's current stance of <strong className="font-bold">{topic.currentStance.toFixed(1)}/10</strong>. Choose your goal: </p>
+                        <p className="mb-4 text-gray-700 dark:text-gray-300"> Challenge the AI&apos;s current stance of <strong className="font-bold">{topic.currentStance.toFixed(1)}/10</strong>. Choose your goal: </p>
                         <div className="flex flex-col sm:flex-row gap-4">
                             {/* --- Button 1: Persuade Left --- */}
                             <button
