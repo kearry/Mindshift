@@ -25,9 +25,7 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "webpack": "^5.98.0",
-    "character-entities": "^2.0.2",
-    "markdown-table": "^3.0.4"
+    "webpack": "^5.98.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
