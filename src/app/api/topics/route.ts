@@ -1,11 +1,11 @@
 // src/app/api/topics/route.ts
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { getAiInitialStance } from '@/lib/aiService';
 
-const prisma = new PrismaClient();
 
 // --- POST function (Saves scaleDefinitions if valid) ---
 export async function POST(request: Request) {

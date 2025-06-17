@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcrypt';
 import { createHmac } from 'crypto';
 
@@ -21,7 +21,6 @@ function signJwt(payload: Record<string, unknown>, secret: string, expiresIn = 3
     return `${data}.${signatureEncoded}`;
 }
 
-const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
     try {
@@ -69,6 +68,6 @@ export async function POST(request: Request) {
         console.error('Login error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     } finally {
-        await prisma.$disconnect();
+        // No disconnect for shared Prisma instance
     }
 }
