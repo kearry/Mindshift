@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient, Prisma } from '@prisma/client'; // Import Prisma for types
+import { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 
-const prisma = new PrismaClient();
 
 interface RouteParams {
     userId: string; // ID of the user being followed/unfollowed

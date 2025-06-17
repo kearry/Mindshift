@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
 const saltRounds = 10; // Cost factor for bcrypt
 
 export async function POST(request: Request) {
@@ -46,6 +45,6 @@ export async function POST(request: Request) {
         console.error('Registration error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     } finally {
-        await prisma.$disconnect(); // Disconnect Prisma client
+        // No disconnect for shared Prisma instance
     }
 }

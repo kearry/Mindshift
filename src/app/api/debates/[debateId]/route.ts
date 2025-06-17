@@ -1,13 +1,13 @@
 // src/app/api/debates/[debateId]/route.ts (Updated with LLM provider selection)
 import { NextResponse } from 'next/server';
-import { PrismaClient, Argument } from '@prisma/client';
+import { Argument } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 
 // Import functions from service files
 import { getAiDebateResponse, generateAndSaveSummary, AiResponseInput } from '@/lib/aiService';
 
-const prisma = new PrismaClient();
 
 // Type Definitions
 interface RouteParams { debateId: string; }
