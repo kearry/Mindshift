@@ -31,6 +31,20 @@ Other variables configure OpenAI credentials, Ollama connection and database pat
 
 The selected provider and model can also be changed globally from the **AI Settings** menu in the header. These settings apply to both topic creation and debates.
 
+## Running Tests
+
+Make sure all dependencies are installed:
+
+```bash
+npm install
+```
+
+Then run the Jest unit tests with:
+
+```bash
+npm test
+```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
