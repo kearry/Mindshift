@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useLLMSettings } from '@/components/LLMSettingsContext';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
 import { MAX_ARGUMENT_CHARS } from '@/lib/constants';
+import StanceIndicator from '@/components/Debates/StanceIndicator';
 // --- Define expected data structure (Helper Types) ---
 type UserSnippet = {
     userId: number;
@@ -290,6 +291,10 @@ export default function DebatePage() {
     // Calculate flags *after* confirming debate is not null
     const loggedInUserId = session?.user?.id ? parseInt(session.user.id, 10) : null;
     const isOwner = loggedInUserId === debate.user.userId; // Safe access
+    // Determine the AI's current stance based on debate progress
+    const lastArgument = debate.arguments[debate.arguments.length - 1];
+    const currentStance = debate.finalStance ?? (lastArgument ? (lastArgument.stanceAfter ?? lastArgument.stanceBefore) : debate.initialStance);
+    const userGoalStance = debate.goalDirection === 'left' ? 0 : 10;
     // *** Use Corrected Turn Logic ***
     const canSubmitArgument = debate.status === 'active' &&
         isOwner &&
@@ -324,6 +329,13 @@ export default function DebatePage() {
                 {debate.status === 'completed' && debate.pointsEarned !== null && (
                     <p className="text-lg font-medium">Points Earned: {debate.pointsEarned.toFixed(1)}</p>
                 )}
+                <p className="text-sm text-gray-500 dark:text-gray-500">AI Initial Stance: {debate.initialStance.toFixed(1)}/10</p>
+                <p className="text-sm text-gray-500 dark:text-gray-500">Your Goal Position: {userGoalStance}/10</p>
+                <StanceIndicator
+                    currentStance={currentStance}
+                    initialStance={debate.initialStance}
+                    status={debate.status}
+                />
             </div>
 
             {/* Delete Button (Conditional) */}
