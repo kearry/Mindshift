@@ -4,6 +4,7 @@ import { Argument } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
+import { MAX_ARGUMENT_CHARS } from '@/lib/constants';
 
 // Import functions from service files
 import { getAiDebateResponse, generateAndSaveSummary, AiResponseInput } from '@/lib/aiService';
@@ -100,7 +101,9 @@ export async function POST(request: Request, context: RouteContext) {
         if (!argumentText?.trim()) {
             return NextResponse.json({ error: 'Argument text is required' }, { status: 400 });
         }
-
+        if (argumentText.trim().length > MAX_ARGUMENT_CHARS) {
+            return NextResponse.json({ error: `Argument exceeds ${MAX_ARGUMENT_CHARS} character limit` }, { status: 400 });
+        }
         // --- Step 1: Transaction (Fetch history, Save user arg) ---
         const transactionResult = await prisma.$transaction<TransactionResult>(async (tx) => {
             // Get debate with existing arguments

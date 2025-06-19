@@ -3,6 +3,7 @@ import Link from 'next/link';
 import LLMSelector from '@/components/LLMSelector';
 import { useLLMSettings } from '@/components/LLMSettingsContext';
 
+import { MAX_ARGUMENT_CHARS } from "@/lib/constants";
 interface Props {
     isMyTurn: boolean;
     debateId: number;
@@ -37,6 +38,10 @@ export default function ArgumentInput({
     const handleArgumentSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!currentArgument.trim() || isSubmittingArgument || isNaN(debateId)) return;
+        if (currentArgument.trim().length > MAX_ARGUMENT_CHARS) {
+            setArgumentSubmitMessage(`Error: Argument exceeds ${MAX_ARGUMENT_CHARS} character limit.`);
+            return;
+        }
 
         setIsSubmittingArgument(true);
         setArgumentSubmitMessage(`Submitting argument to ${selectedProvider} (${selectedModel})...`);
