@@ -330,3 +330,42 @@ function calculatePoints(stanceShift: number, goalDirection: string): number {
     }
     return 0;
 }
+
+// --- DELETE Handler (Delete Debate and related content) ---
+export async function DELETE(
+    _request: Request,
+    context: RouteContext
+) {
+    const session = await getServerSession(authOptions);
+    const userIdString = session?.user?.id;
+    const userId = userIdString ? parseInt(userIdString, 10) : null;
+    if (!session || !userId || isNaN(userId)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let debateIdString: string | undefined;
+    let debateId: number;
+    try {
+        const params = await context.params;
+        debateIdString = params.debateId;
+        debateId = parseInt(debateIdString, 10);
+        if (isNaN(debateId)) {
+            return NextResponse.json({ error: 'Invalid Debate ID format' }, { status: 400 });
+        }
+
+        const debate = await prisma.debate.findUnique({ where: { debateId } });
+        if (!debate) {
+            return NextResponse.json({ error: 'Debate not found' }, { status: 404 });
+        }
+        if (debate.userId !== userId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        await prisma.debate.delete({ where: { debateId } });
+        return NextResponse.json({ message: 'Debate deleted successfully' }, { status: 200 });
+    } catch (error: unknown) {
+        console.error(`Error deleting debate ${debateIdString}:`, error);
+        const message = error instanceof Error ? error.message : 'Internal Server Error';
+        return NextResponse.json({ error: message }, { status: 500 });
+    }
+}
