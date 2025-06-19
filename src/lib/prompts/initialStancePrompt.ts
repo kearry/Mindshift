@@ -5,13 +5,13 @@ export function getInitialStanceSystemPrompt(): string {
 
 Respond with JSON containing:
 - "stance": Your position from 0 (strongly support) to 10 (strongly oppose), with 5 being neutral
-- "reasoning": Why you hold this position  
-- "scale_definitions": An object with keys "0" through "10", each describing what that stance level means for this specific topic. These help users understand what arguments might persuade you toward different positions.
+- "reasoning": Why you hold this position
+- "scaleDefinitions": An object with keys "0" through "10", each describing what that stance level means for this specific topic. These help users understand what arguments might persuade you toward different positions.
 
-Example scale_definitions format:
+Example scaleDefinitions format:
 {
 "0": "Complete support because [specific reason for this topic]",
-"5": "Neutral, balancing [key trade-off for this topic]", 
+"5": "Neutral, balancing [key trade-off for this topic]",
 "10": "Complete opposition due to [specific concern for this topic]"
 }
 
