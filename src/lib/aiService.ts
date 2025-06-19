@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { Argument, PrismaClient } from '@prisma/client';
 import { getOllamaRawResponse, extractJsonObject } from './ollamaService';
 import { getInitialStanceSystemPrompt, getInitialStanceUserMessage } from './prompts/initialStancePrompt';
+import { logLLMInteraction } from './llmLogger';
 
 const prisma = new PrismaClient();
 
@@ -60,6 +61,7 @@ export async function getAiInitialStance(
                 response_format: { type: 'json_object' }
             });
             const content = completion.choices[0]?.message?.content || '{}';
+            await logLLMInteraction('openai', llmModel, `System: ${systemPrompt}\nUser: ${userMessage}`, content);
             const aiResult = JSON.parse(content);
             usedModel = `openai:${llmModel}`;
             if (typeof aiResult.stance === 'number') {
@@ -79,6 +81,7 @@ export async function getAiInitialStance(
                 userMessage,
                 systemPrompt
             );
+            await logLLMInteraction('ollama', llmModel, `System: ${systemPrompt}\nUser: ${userMessage}`, response);
             usedModel = `ollama:${llmModel}`;
             const jsonString = extractJsonObject(response);
             if (!jsonString) {
@@ -204,6 +207,7 @@ Be fair but not too easy to persuade. Require good arguments to shift your posit
 
             // Parse OpenAI response
             const content = completion.choices[0]?.message?.content || '{}';
+            await logLLMInteraction('openai', llmModel, `System: ${systemPrompt}\nUser: ${currentArgumentText}`, content);
             const aiResult = JSON.parse(content);
             usedModel = `openai:${llmModel}`; // Track provider and model used
 
@@ -228,6 +232,7 @@ Be fair but not too easy to persuade. Require good arguments to shift your posit
                 currentArgumentText,
                 systemPrompt
             );
+            await logLLMInteraction('ollama', llmModel, `System: ${systemPrompt}\nUser: ${currentArgumentText}`, response);
 
             usedModel = `ollama:${llmModel}`;
 
@@ -358,6 +363,7 @@ rhetorical strategies, and the evolution of the discussion. Write in a balanced,
             temperature: 0.7,
             max_tokens: 1500
         });
+        await logLLMInteraction('openai', summaryModel, `System: ${systemPrompt}\nUser: ${summaryHistory}`, completion.choices[0]?.message?.content || '');
 
         const summaryText = completion.choices[0]?.message?.content?.trim() || "[Summary generation failed]";
 
