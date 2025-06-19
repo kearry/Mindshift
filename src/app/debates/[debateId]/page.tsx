@@ -10,7 +10,6 @@ import { useSession } from 'next-auth/react';
 import ReactMarkdown from 'react-markdown'; // Use correct import
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
-import LLMSelector from '@/components/LLMSelector';
 import { useLLMSettings } from '@/components/LLMSettingsContext';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
 // --- Define expected data structure (Helper Types) ---
@@ -83,13 +82,6 @@ export default function DebatePage() {
     const [isSubmittingArgument, setIsSubmittingArgument] = useState(false);
     const [argumentError, setArgumentError] = useState<string | null>(null);
     const { provider, model } = useLLMSettings();
-    const [selectedProvider, setSelectedProvider] = useState<'openai' | 'ollama'>(provider);
-    const [selectedModel, setSelectedModel] = useState<string>(model);
-
-    const handleModelSelect = (provider: 'openai' | 'ollama', model: string) => {
-        setSelectedProvider(provider);
-        setSelectedModel(model);
-    };
 
 
     // --- Hooks ---
@@ -120,8 +112,6 @@ export default function DebatePage() {
             }
             const debateData: DebateWithRelations = await debateResponse.json();
             setDebate(debateData);
-            setSelectedProvider((debateData.llmProvider as 'openai' | 'ollama') ?? 'openai');
-            setSelectedModel(debateData.llmModel ?? 'gpt-4o-mini');
 
             // Fetch comments
             const commentsResponse = await fetch(`/api/debates/${debateId}/comments`);
@@ -261,8 +251,8 @@ export default function DebatePage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     argumentText: newArgumentText.trim(),
-                    llmProvider: selectedProvider,
-                    llmModel: selectedModel
+                    llmProvider: provider,
+                    llmModel: model
                 }),
             });
             if (!response.ok) {
@@ -412,11 +402,6 @@ export default function DebatePage() {
                     <h2 className="text-2xl font-semibold mb-4">Your Turn (Turn {Math.floor(debate.turnCount / 2) + 1})</h2>
                     {/* Argument Submission Form */}
                     <form onSubmit={handleArgumentSubmit}>
-                        <LLMSelector
-                            onModelSelect={handleModelSelect}
-                            defaultProvider={selectedProvider}
-                            defaultModel={selectedModel}
-                        />
                         <label htmlFor="argumentText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"> Enter your argument </label>
                         <textarea id="argumentText" rows={5}
                             className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
