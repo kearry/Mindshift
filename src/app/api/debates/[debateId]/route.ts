@@ -252,6 +252,12 @@ export async function POST(request: Request, context: RouteContext) {
                 }
             });
 
+            // Update user's total points
+            await prisma.user.update({
+                where: { userId: userId },
+                data: { totalPoints: { increment: pointsThisTurn } }
+            });
+
             // Update topic stance
             await prisma.topic.update({
                 where: { topicId: debateTopicId },
