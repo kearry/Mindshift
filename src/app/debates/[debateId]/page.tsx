@@ -12,6 +12,7 @@ import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { useLLMSettings } from '@/components/LLMSettingsContext';
 import type { Pluggable } from 'unified'; // Import Pluggable type for plugins
+import { MAX_ARGUMENT_CHARS } from '@/lib/constants';
 // --- Define expected data structure (Helper Types) ---
 type UserSnippet = {
     userId: number;
@@ -236,6 +237,7 @@ export default function DebatePage() {
         event.preventDefault(); // Prevent page reload
         // Basic validation and turn check
         if (!newArgumentText.trim()) { setArgumentError("Argument cannot be empty."); return; }
+        if (newArgumentText.trim().length > MAX_ARGUMENT_CHARS) { setArgumentError(`Argument exceeds ${MAX_ARGUMENT_CHARS} character limit.`); return; }
         // Ensure debate exists before accessing properties
         if (!session?.user?.id || !debate || parseInt(session.user.id, 10) !== debate.user.userId) {
             setArgumentError("Cannot submit argument: Not logged in or not your debate turn.");

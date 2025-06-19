@@ -26,6 +26,7 @@ Create a `.env` file based on the provided `.env.example`. Key variables include
 
 - `DEFAULT_LLM_PROVIDER` – provider used for both topic creation and debates (`openai` or `ollama`)
 - `DEFAULT_LLM_MODEL` – model name used when no specific model is selected
+- `MAX_ARGUMENT_CHARS` – maximum characters allowed per argument
 
 Other variables configure OpenAI credentials, Ollama connection and database paths. See `.env.example` for the full list.
 
