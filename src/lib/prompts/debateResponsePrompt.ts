@@ -23,7 +23,7 @@ export function getDebateResponseSystemPrompt(
 
     return `You're discussing: "${debateTopicName}"
 
-Your current position: ${stanceBefore}/10 (1=strongly support, 10=strongly oppose)
+Your current position: ${stanceBefore}/10 (0=strongly support, 10=strongly oppose)
 
 Previous discussion:
 ${argumentHistory}
@@ -39,7 +39,7 @@ Based on your evaluation, your stance may shift, stay the same, or even move in 
 
 Respond with JSON:
 - "response": Your natural reply to their argument
-- "new_stance": Your updated position (1-10)
+- "new_stance": Your updated position (0-10)
 - "reasoning": Brief explanation of any stance change
 
 Be genuine in your evaluation. Strong arguments should move you; weak ones shouldn't.`;

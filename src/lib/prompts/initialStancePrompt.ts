@@ -4,11 +4,18 @@ export function getInitialStanceSystemPrompt(): string {
   return `You will be given a topic to consider. Analyze it and form an initial position.
 
 Respond with JSON containing:
-- "stance": Your position from 1 (strongly support) to 10 (strongly oppose), with 5 being neutral
-- "reasoning": Why you hold this position
-- "key_factors": The main considerations that shaped your view
+- "stance": Your position from 0 (strongly support) to 10 (strongly oppose), with 5 being neutral
+- "reasoning": Why you hold this position  
+- "scale_definitions": An object with keys "0" through "10", each describing what that stance level means for this specific topic. These help users understand what arguments might persuade you toward different positions.
 
-Be thoughtful but concise. There are no wrong answers.`;
+Example scale_definitions format:
+{
+"0": "Complete support because [specific reason for this topic]",
+"5": "Neutral, balancing [key trade-off for this topic]", 
+"10": "Complete opposition due to [specific concern for this topic]"
+}
+
+Make each definition specific to the topic, not generic.`;
 }
 
 export function getInitialStanceUserMessage(topicName: string, topicDescription: string | null | undefined): string {
